@@ -11,14 +11,17 @@ final class SettingsWindow: NSObject {
     private let spelling = NSButton(checkboxWithTitle: "Исправлять очевидные опечатки", target: nil, action: nil)
     private let learning = NSButton(checkboxWithTitle: "Учиться на повторных отменах", target: nil, action: nil)
     private let login = NSButton(checkboxWithTitle: "Запускать при входе в систему", target: nil, action: nil)
+    private let updates = NSButton(checkboxWithTitle: "Проверять обновления автоматически (раз в сутки, GitHub)",
+                                   target: nil, action: nil)
+    private let updater: Updater
     private let undo = ShortcutRecorder(), protect = ShortcutRecorder()
     private let english = NSPopUpButton(), russian = NSPopUpButton()
     private let word = NSTextField(), apps = NSTextField()
     private let protectedList: WordTable
     private let learnedList: WordTable
 
-    init(store: ProfileStore, engine: Coordinator) {
-        self.store = store; self.engine = engine
+    init(store: ProfileStore, engine: Coordinator, updater: Updater) {
+        self.store = store; self.engine = engine; self.updater = updater
         protectedList = WordTable(label: "Защищенные слова", height: 100) { store.profile.protectedWords }
         learnedList = WordTable(label: "Выученные слова", height: 80) { store.profile.learnedWords }
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 650),
@@ -37,6 +40,8 @@ final class SettingsWindow: NSObject {
         add(row(button("Разрешить доступ", #selector(permissions)), button("Проверить доступ", #selector(retry))), to: stack)
         login.target = self; login.action = #selector(launchAtLogin)
         add(login, to: stack)
+        updates.target = self; updates.action = #selector(automaticUpdates)
+        add(updates, to: stack)
         spelling.target = self; spelling.action = #selector(options)
         learning.target = self; learning.action = #selector(options)
         add(spelling, to: stack)
@@ -81,6 +86,7 @@ final class SettingsWindow: NSObject {
     func refresh() {
         spelling.state = store.profile.spelling ? .on : .off
         learning.state = store.profile.learning ? .on : .off
+        updates.state = updater.automatic ? .on : .off
         undo.binding = store.profile.undo; protect.binding = store.profile.protect
         apps.stringValue = store.profile.excludedApps.joined(separator: ", ")
         for (popup, language, selected) in [(english, Language.en, engine.sources.english?.id),
@@ -119,6 +125,8 @@ final class SettingsWindow: NSObject {
         syncLogin()
     }
     private func syncLogin() { login.state = SMAppService.mainApp.status == .enabled ? .on : .off }
+    // Machine-local like the login item: not part of the portable profile.
+    @objc private func automaticUpdates() { updater.setAutomatic(updates.state == .on) }
     @objc private func options() { store.update { $0.spelling = spelling.state == .on; $0.learning = learning.state == .on } }
     @objc private func sources() {
         store.update { $0.englishSource = english.selectedItem?.representedObject as? String

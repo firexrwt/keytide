@@ -23,6 +23,8 @@ codesign -dvvv "$target" 2>&1 | grep '^CDHash='
 if [ "$(defaults read dev.firexrwt.keytide DebugInput 2>/dev/null)" = 1 ]; then
     echo "warning: DebugInput diagnostics are on: defaults delete dev.firexrwt.keytide DebugInput" >&2
 fi
-echo "An ad-hoc rebuild changes CDHash: remove the old Keytide from Accessibility, then add it again." >&2
+if codesign -d -r- "$target" 2>&1 | grep -q cdhash; then
+    echo "Ad-hoc build: its CDHash changed, so remove the old Keytide from Accessibility, then add it again." >&2
+fi
 # LaunchServices can return -600 right after the old process exits.
 open "$target" || { sleep 2; open "$target"; }

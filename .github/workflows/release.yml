@@ -11,6 +11,11 @@ permissions:
 jobs:
   dmg:
     runs-on: macos-15
+    # The signing key is an environment secret: the job waits for the owner's approval and runs only for v* tags.
+    environment: release
+    env:
+      # Installed apps accept an update only from this certificate (SHA-1 of the leaf, as codesign prints it).
+      REQUIREMENT: 'identifier "dev.firexrwt.keytide" and certificate leaf = H"f17aa23f772d72310797b7e3aabd4db522de9923"'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,12 +33,42 @@ jobs:
       - name: Test (release)
         run: swift test -c release
 
+      # Every release is signed with the same certificate: installed copies keep their Accessibility grant and
+      # accept the update. The keychain lives only for this job.
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.KEYTIDE_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.KEYTIDE_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/keytide.keychain-db"
+          password=$(uuidgen)
+          printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/keytide.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/keytide.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/keytide.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+
       - name: Build app
-        run: bash scripts/build-app.sh
+        env:
+          KEYTIDE_REQUIRE_IDENTITY: '1'
+        run: |
+          bash scripts/build-app.sh
+          codesign --verify --strict -R="$REQUIREMENT" build/Keytide.app
 
       - name: Pack dmg
         id: pack
-        run: echo "dmg=$(bash scripts/make-dmg.sh)" >> "$GITHUB_OUTPUT"
+        env:
+          KEYTIDE_REQUIRE_IDENTITY: '1'
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          dmg=$(bash scripts/make-dmg.sh)
+          test "$dmg" = "build/Keytide-$version.dmg"
+          test "$(stat -f %z "$dmg")" -le 52428800
+          codesign --verify --strict -R="$REQUIREMENT" "$dmg"
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
 
       - name: Draft release
         env:
@@ -41,4 +76,8 @@ jobs:
           TAG: ${{ github.ref_name }}
           DMG: ${{ steps.pack.outputs.dmg }}
         run: |
-          gh release create "$TAG" "$DMG" --draft --title "Keytide $TAG" --notes "Install: open the dmg and drag Keytide to Applications. The app is not notarized: on first launch right-click Keytide and choose Open, then allow it in System Settings > Privacy & Security > Accessibility. After an update remove the old Keytide entry there with - and add the app again."
+          gh release create "$TAG" "$DMG" --draft --title "Keytide $TAG" --notes "Install: open the dmg and drag Keytide to Applications. The app is not notarized: if macOS refuses to open it, click Open Anyway in System Settings > Privacy & Security, then allow it in System Settings > Privacy & Security > Accessibility. Keytide 0.1.1 and later update themselves from the menu and keep that permission. Coming from 0.1.0: remove the old Keytide entry there with - and add the app again, once."
+
+      - name: Remove signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/keytide.keychain-db" || true
