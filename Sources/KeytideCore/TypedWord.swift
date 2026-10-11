@@ -1,0 +1,85 @@
+import Foundation
+
+// The word being typed, rebuilt from key events where the field cannot be read. Only the current word, never history.
+public struct TypedWord {
+    private var characters: [Character] = []
+    private var known = true
+
+    public init() {}
+
+    public var current: String? { known && !characters.isEmpty ? String(characters) : nil }
+
+    // One key press, in the order the focused app receives it. `text` is nil when the key's characters could not
+    // be read. Returns the finished word on a plain space.
+    public mutating func key(_ code: UInt16, _ modifiers: Modifiers, text: @autoclosure () -> String?) -> Retype? {
+        // Chords (paste, undo, select all) change the text in ways the key stream cannot show.
+        guard modifiers.intersection([.command, .control, .option]).isEmpty else { invalidate(); return nil }
+        switch code {
+        case 49: return finish()
+        case 36, 76: restart()
+        case 51: deleteBackward()
+        default:
+            if let text = text() { append(text) } else { invalidate() }
+        }
+        return nil
+    }
+
+    // Only characters typed since the word start are ever deleted later, so starting over is always safe; only text
+    // the key stream cannot show (chords, dropped input, unreadable keys) makes the word unknown.
+    // A key without characters (fn / Globe switching the layout) leaves the word as is. Arrows, Escape, Tab and
+    // Delete move the caret or change the field: the next characters start a new word.
+    public mutating func append(_ text: String) {
+        guard !text.isEmpty else { return }
+        guard text.allSatisfy({ Self.accepts($0) }) else { restart(); return }
+        guard known else { return }
+        guard characters.count + text.count <= Words.maximumLength else { invalidate(); return }
+        characters.append(contentsOf: text)
+    }
+
+    // Deleting past the word start removes older text that later Backspaces never reach.
+    public mutating func deleteBackward() {
+        if known && !characters.isEmpty { characters.removeLast() }
+    }
+
+    public mutating func invalidate() { known = false; characters.removeAll(keepingCapacity: true) }
+    public mutating func restart() { known = true; characters.removeAll(keepingCapacity: true) }
+
+    public mutating func finish() -> Retype? {
+        defer { restart() }
+        guard let typed = current else { return nil }
+        let retype = Retype(typed: typed)
+        return retype.word.isEmpty ? nil : retype
+    }
+
+    // Arrows and function keys report Private Use characters; Tab, Escape and Delete report controls.
+    static func accepts(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy {
+            !CharacterSet.whitespacesAndNewlines.contains($0) && !CharacterSet.controlCharacters.contains($0) &&
+                !(0xE000...0xF8FF).contains($0.value)
+        }
+    }
+}
+
+public struct Retype: Equatable {
+    public let word: String
+    public let suffix: String
+
+    public init(word: String, suffix: String) { self.word = word; self.suffix = suffix }
+
+    // Keep the explicit closure: `allSatisfy(Words.trailingPunctuation.contains)` here returned the inverse in
+    // release builds called from another module (Swift 6.4, 2026-10-10), while debug tests passed.
+    public init(typed: String) {
+        var split = typed.endIndex
+        while split > typed.startIndex {
+            let before = typed.index(before: split)
+            guard typed[before].unicodeScalars.allSatisfy({ Words.trailingPunctuation.contains($0) }) else { break }
+            split = before
+        }
+        word = String(typed[..<split])
+        suffix = String(typed[split...])
+    }
+
+    // Backspaces for the typed characters plus the boundary space the app already received.
+    public var deletions: Int { word.count + suffix.count + 1 }
+    public func text(_ replacement: String) -> String { replacement + suffix + " " }
+}

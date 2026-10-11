@@ -1,0 +1,44 @@
+name: Release
+
+# A tag v<version> builds the dmg on a macOS runner and drafts a GitHub Release with it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Repo scripts run later in this job; only the release step needs the token, through GH_TOKEN.
+          persist-credentials: false
+
+      - name: Tag matches the app version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          test "$TAG" = "v$version" || { echo "Tag $TAG does not match version $version" >&2; exit 1; }
+
+      # The app ships optimized; a release-only miscompile once passed every debug test.
+      - name: Test (release)
+        run: swift test -c release
+
+      - name: Build app
+        run: bash scripts/build-app.sh
+
+      - name: Pack dmg
+        id: pack
+        run: echo "dmg=$(bash scripts/make-dmg.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          DMG: ${{ steps.pack.outputs.dmg }}
+        run: |
+          gh release create "$TAG" "$DMG" --draft --title "Keytide $TAG" --notes "Install: open the dmg and drag Keytide to Applications. The app is not notarized: on first launch right-click Keytide and choose Open, then allow it in System Settings > Privacy & Security > Accessibility. After an update remove the old Keytide entry there with - and add the app again."
