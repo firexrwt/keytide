@@ -9,7 +9,11 @@ public struct WordLexicon {
 
     public static func bundled() throws -> WordLexicon {
         // SwiftPM's generated Bundle.module traps when absent; a missing dictionary must leave typing alive.
-        var locations = [Bundle.main.resourceURL, Bundle(for: LexiconBundleMarker.self).resourceURL, Bundle.main.bundleURL]
+        let own = Bundle(for: LexiconBundleMarker.self)
+        var locations = [Bundle.main.resourceURL, own.resourceURL, Bundle.main.bundleURL]
+        // Tests load Core inside an .xctest bundle and SwiftPM's classic layout puts the resource bundle next to it.
+        // Only then: the app links Core statically, so it never looks outside its own bundle.
+        if own != Bundle.main { locations.append(own.bundleURL.deletingLastPathComponent()) }
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["PACKAGE_RESOURCE_BUNDLE_PATH"] {
             locations.insert(URL(fileURLWithPath: path), at: 0)
