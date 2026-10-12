@@ -46,7 +46,7 @@ final class FocusedText {
         // Excluded apps and Keytide itself leave no trace, not even their ID.
         guard let app = owner, app.processIdentifier != getpid(),
               let id = app.bundleIdentifier, !exclusions.contains(id) else { return .blocked("app") }
-        InputDiagnostics.record("capture app=\(id) front=\(app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier)")
+        InputDiagnostics.record("capture \(InputDiagnostics.app(id)) front=\(app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier)")
         guard Self.compatibleApps.contains(id) else { return .unreadable("app") }
         guard let element = focus else { return .unreadable("focus") }
         let selection: NSRange

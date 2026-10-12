@@ -53,7 +53,7 @@ final class KeystrokeCorrector {
             InputDiagnostics.record("keys field word same")
             return .word(Typed(retype: typed.retype, serial: typed.serial, field: field))
         case .read(.whole(let retype), let field, let loose):
-            InputDiagnostics.record("keys field word whole length=\(retype.word.count) loose=\(loose)")
+            InputDiagnostics.record("keys field word whole loose=\(loose)")
             return .word(Typed(retype: retype, serial: typed.serial, field: field))
         case .read(.changed, _, _):
             return refuseResolution("field shows another word")

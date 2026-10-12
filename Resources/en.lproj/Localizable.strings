@@ -134,9 +134,13 @@
 "about.license" = "MIT License";
 "about.checkUpdates" = "Check for Updates...";
 "about.help" = "Help and diagnostics";
-"about.diagnostics" = "Detailed diagnostics until Keytide quits (stages and lengths, never text)";
+"about.diagnostics" = "Detailed diagnostics for 30 minutes (steps only: no text, app names or times)";
 "about.saveReport" = "Save Report...";
 "about.reportBug" = "Report a Bug";
-"about.report.note" = "The report has no typed text: versions, settings, counts, app IDs and timed diagnostic stages. GitHub issues are public: open the file and check it before attaching.";
+"about.report.note" = "The report is anonymous: versions, settings, counts and numbered diagnostic steps. No typed text, app names or times. You see all of it before saving.";
+"about.preview.title" = "Report preview";
+"about.preview.text" = "This is everything the file will contain. GitHub issues are public.";
+"about.preview.save" = "Save...";
+"about.preview.cancel" = "Cancel";
 "about.reportSaved" = "Report saved.";
 "about.reportFailed" = "Could not save the report: %@";

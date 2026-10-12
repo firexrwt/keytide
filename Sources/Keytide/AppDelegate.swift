@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let warning = store.warning { status = warning }
         if !AXIsProcessTrusted() { openSettings() }
         updater.start()
+        // Diagnostics turned on at launch (DebugInput) also end after their 30 minutes.
+        if InputDiagnostics.enabled { InputDiagnostics.setEnabled(true) }
     }
 
     private func report(_ text: String) {

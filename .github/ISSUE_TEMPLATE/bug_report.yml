@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Keytide > Settings > About > Report a Bug fills in the version and macOS. Please attach the report from Save Report... It has no typed text, but it lists app IDs and timings, and issues here are public: open the file and check it first.
-        Keytide > Настройки > О приложении > «Сообщить об ошибке» заполняет версию и macOS. Приложите отчёт из «Сохранить отчёт...». Набранного текста в нём нет, но есть ID приложений и время событий, а сообщения здесь публичные: сначала откройте файл и проверьте его.
+        Keytide > Settings > About > Report a Bug fills in the version and macOS. Please attach the report from Save Report... It is anonymous (no typed text, app names or times) and Keytide shows all of it before saving. Issues here are public.
+        Keytide > Настройки > О приложении > «Сообщить об ошибке» заполняет версию и macOS. Приложите отчёт из «Сохранить отчёт...». Он анонимный (без набранного текста, названий приложений и времени), и Keytide показывает его целиком перед сохранением. Сообщения здесь публичные.
   - type: textarea
     id: what
     attributes:

@@ -30,8 +30,9 @@ enum DiagnosticReport {
             "Signature: \(UpdateInstaller.signature.rawValue)",
             "macOS \(system), \(architecture), interface language \(L10n.language)",
             "Accessibility: \(AXIsProcessTrusted()), Secure Input now: \(IsSecureEventInputEnabled())",
-            "Layouts: \(engine.sources.entries.map(\.id).joined(separator: ", "))",
-            "Chosen: EN \(engine.sources.english?.id ?? "-"), RU \(engine.sources.russian?.id ?? "-")",
+            // The two layouts Keytide works with; others only counted (they say which languages a person types).
+            "Layouts: EN \(engine.sources.english?.id ?? "-"), RU \(engine.sources.russian?.id ?? "-"), " +
+                "\(engine.sources.entries.count) enabled in total",
             "Enabled: \(profile.enabled), typos: \(profile.spelling), learning: \(profile.learning), " +
                 "automatic update check: \(updater.automatic), launch at login: \(SMAppService.mainApp.status == .enabled)",
             "Protected words: \(profile.protectedWords.count), learned: \(profile.learnedWords.count), " +
@@ -42,7 +43,7 @@ enum DiagnosticReport {
             "Detailed diagnostics: \(InputDiagnostics.enabled ? "on" : "off (turn on in About, repeat the problem, save again)")",
             "GitHub issues are public: read this file before attaching it.",
             "",
-            "Diagnostics of this run (UTC times; stages and lengths, never text):",
+            "Diagnostics of this run (numbered steps, apps as app1, app2; never text, app names or times):",
         ]
         // Kept in memory by InputDiagnostics; one line each, at most 300 characters.
         let recent = InputDiagnostics.recent.map { String($0.replacingOccurrences(of: "\n", with: " ").prefix(300)) }

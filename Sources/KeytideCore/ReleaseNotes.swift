@@ -31,6 +31,16 @@ public enum ReleaseNotes {
                 "Settings are split into tabs.",
             ],
         ],
+        "0.1.4": [
+            "ru": [
+                "Отчёт для сообщения об ошибке теперь анонимный: приложения в нём под номерами, без времени и без длины набранных слов. Перед сохранением вы видите его целиком.",
+                "Подробная диагностика сама выключается через 30 минут.",
+            ],
+            "en": [
+                "The bug report is anonymous now: apps appear as numbers, with no times and no lengths of typed words. You see all of it before saving.",
+                "Detailed diagnostics turn themselves off after 30 minutes.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

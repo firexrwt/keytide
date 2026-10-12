@@ -13,7 +13,7 @@ extension Coordinator {
             store.profile.excludedApps.contains(app.bundleIdentifier ?? "") {
             InputDiagnostics.record("keys retry refused: app changed"); return
         }
-        if !retry { InputDiagnostics.record("keys typed length=\(typed.retype.word.count)") }
+        if !retry { InputDiagnostics.record("keys typed") }
         let resolved: Typed
         switch typing.resolve(typed, app: app, last: retry) {
         case .word(let word): resolved = word

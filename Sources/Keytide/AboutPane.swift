@@ -27,6 +27,7 @@ final class AboutPane: NSObject {
         identity.orientation = .vertical; identity.alignment = .leading; identity.spacing = 2
         let header = Form.row(icon, identity); header.spacing = 14
         diagnostics.target = self; diagnostics.action = #selector(toggleDiagnostics)
+        InputDiagnostics.onChange = { [weak self] in self?.refresh() }
         let site = URL(string: "https://firexrwt.com")!, repo = URL(string: "https://github.com/firexrwt/keytide")!
         Form.add(header, Form.label(tr("about.tagline")),
                  Form.label(tr("about.links"), bold: true),
@@ -59,15 +60,42 @@ final class AboutPane: NSObject {
     }
     @objc private func toggleDiagnostics() { InputDiagnostics.setEnabled(diagnostics.state == .on) }
     @objc private func reportBug() { if let link = DiagnosticReport.bugLink { NSWorkspace.shared.open(link) } }
+    // The whole report is shown first, and exactly that text is saved: nothing leaves without being seen.
     @objc private func saveReport() {
-        guard let window = window() else { return }
+        guard let window = window(), window.attachedSheet == nil else { return }
+        let report = DiagnosticReport.text(store: store, engine: engine, updater: updater)
+        let preview = NSAlert()
+        preview.messageText = tr("about.preview.title")
+        preview.informativeText = tr("about.preview.text")
+        preview.accessoryView = Self.reportView(report)
+        preview.addButton(withTitle: tr("about.preview.save"))
+        preview.addButton(withTitle: tr("about.preview.cancel"))
+        preview.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            save(report, from: window)
+        }
+    }
+
+    private func save(_ report: String, from window: NSWindow) {
         let panel = NSSavePanel(); panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "Keytide-report.txt"; panel.message = tr("about.report.note")
+        panel.nameFieldStringValue = "Keytide-report.txt"
         panel.beginSheetModal(for: window) { [weak self] result in
             guard let self, result == .OK, let url = panel.url else { return }
-            let report = DiagnosticReport.text(store: store, engine: engine, updater: updater)
             do { try SecureFile.write(Data(report.utf8), to: url); show(tr("about.reportSaved")) }
             catch { show(tr("about.reportFailed", error.localizedDescription)) }
         }
+    }
+
+    private static func reportView(_ report: String) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.frame = NSRect(x: 0, y: 0, width: 520, height: 280)
+        scroll.borderType = .bezelBorder
+        if let text = scroll.documentView as? NSTextView {
+            text.isEditable = false; text.isSelectable = true
+            text.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+            text.string = report
+            text.setAccessibilityLabel(tr("about.preview.title"))
+        }
+        return scroll
     }
 }
