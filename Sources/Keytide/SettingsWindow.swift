@@ -82,6 +82,7 @@ final class SettingsWindow: NSObject {
     func open() {
         refresh(); syncLogin()
         window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        WhatsNew.showOnce(attachedTo: window)
     }
     func refresh() {
         spelling.state = store.profile.spelling ? .on : .off

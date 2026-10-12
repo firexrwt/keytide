@@ -51,6 +51,65 @@ final class TypedWordTests: XCTestCase {
         }
     }
 
+    // Edit guard: a word started where the key stream did not see the text before it may be part of a longer word.
+    func testCaretMovesMarkTheNextWordAsEdited() {
+        // Left arrow, Home, Escape, forward Delete.
+        for text in ["\u{F702}", "\u{F729}", "\u{1B}", "\u{7F}"] {
+            var word = typed("gh")
+            word.append(text)
+            word.append("l"); word.append("f")
+            XCTAssertEqual(word.finish()?.word, "lf")
+            XCTAssertTrue(word.finishedAfterEdit, "\(text.unicodeScalars.map(\.value))")
+            word.append("d"); word.append("f")
+            XCTAssertEqual(word.finish()?.word, "df")
+            XCTAssertFalse(word.finishedAfterEdit, "the boundary re-synchronizes the word with the field")
+        }
+    }
+
+    func testBackspacePastTheWordStartAndClicksMarkEdited() {
+        var word = TypedWord()
+        word.deleteBackward()
+        word.append("l"); word.append("f")
+        _ = word.finish()
+        XCTAssertTrue(word.finishedAfterEdit)
+        var inside = typed("ghbdtnn")
+        inside.deleteBackward()
+        _ = inside.finish()
+        XCTAssertFalse(inside.finishedAfterEdit, "Backspace inside the typed word is tracked exactly")
+        var clicked = typed("gh")
+        clicked.relocate(); clicked.append("l"); clicked.append("f")
+        XCTAssertEqual(clicked.finish()?.word, "lf")
+        XCTAssertTrue(clicked.finishedAfterEdit)
+    }
+
+    func testOnlyUnreadableCharactersMakeAFinishedWordUnknown() {
+        var unknown = typed("lf")
+        _ = unknown.key(5, [], text: nil)
+        XCTAssertNil(unknown.finish())
+        XCTAssertTrue(unknown.finishedUnknown, "only a readable field can name this word")
+        var empty = TypedWord()
+        XCTAssertNil(empty.finish())
+        XCTAssertFalse(empty.finishedUnknown, "a double space has nothing to look up")
+    }
+
+    func testCleanStartsClearTheEditMark() {
+        // Return, Tab or a typed space: the next word starts at a boundary the user typed.
+        var restarted = TypedWord()
+        restarted.relocate(); restarted.restart(); restarted.append("l"); restarted.append("f")
+        _ = restarted.finish()
+        XCTAssertFalse(restarted.finishedAfterEdit)
+        var line = TypedWord()
+        line.relocate(); _ = line.key(36, [], text: self.unexpectedText()); line.append("l")
+        _ = line.finish()
+        XCTAssertFalse(line.finishedAfterEdit)
+        for text in ["\t", " "] {
+            var word = TypedWord()
+            word.relocate(); word.append(text); word.append("l")
+            _ = word.finish()
+            XCTAssertFalse(word.finishedAfterEdit, "\(text.unicodeScalars.map(\.value))")
+        }
+    }
+
     func testKeyWithoutCharactersLeavesWordUnchanged() {
         // fn / Globe switches the layout as key code 179 with an empty string.
         var word = typed("lf")
@@ -115,10 +174,12 @@ final class TypedWordTests: XCTestCase {
         XCTAssertEqual(word.key(49, [], text: " ")?.word, "lf")
         _ = word.key(37, [], text: "l")
         _ = word.key(2, .control, text: self.unexpectedText())
-        XCTAssertNil(word.key(49, [], text: " "), "a shortcut may edit the field")
+        XCTAssertNil(word.key(49, [], text: " "), "a shortcut may edit the field: what came before it is dropped")
         _ = word.key(37, [], text: "l")
         XCTAssertNil(word.key(49, .command, text: self.unexpectedText()), "Cmd+Space is not a boundary")
+        // Letters typed after a chord (Cmd+Space opening Raycast, Cmd+A) are a known run, marked as an edit.
         _ = word.key(37, [], text: "l"); _ = word.key(3, [], text: "f")
-        XCTAssertNil(word.key(49, [], text: " "), "the word stays unknown until a plain space")
+        XCTAssertEqual(word.key(49, [], text: " ")?.word, "lf")
+        XCTAssertTrue(word.finishedAfterEdit)
     }
 }

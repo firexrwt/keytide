@@ -9,18 +9,21 @@ final class Coordinator {
     let tap = EventTap()
     let text = FocusedText()
     var onStatus: ((String) -> Void)?
-    private(set) var corrections = 0
-    private(set) var undos = 0
-    private(set) var stale = 0
-    private var generation: UInt64 = 0
-    private var active: UUID?
-    private var undoRecord: UndoRecord?
+    // Internal, not private: the keystroke path lives in Coordinator+Typing.swift.
+    var corrections = 0
+    var undos = 0
+    var stale = 0
+    var generation: UInt64 = 0
+    var active: UUID?
+    var undoRecord: UndoRecord?
     private var waitingForAccess = false
     private var stoppedForFailure = false
+    // An Electron app came to the front: its accessibility tree is asked for at the first key typed there.
+    private var preparePending = false
     // Lazy: needs tap, sources and text; named apart from the local `keys` in `replace`.
-    private lazy var typing = KeystrokeCorrector(tap: tap, sources: sources, text: text)
+    lazy var typing = KeystrokeCorrector(tap: tap, sources: sources, text: text)
 
-    private struct UndoRecord {
+    struct UndoRecord {
         let snapshot: TextSnapshot
         let replacement: String
         let previousSource: String
@@ -52,6 +55,8 @@ final class Coordinator {
         tap.configure([store.profile.undo, store.profile.protect])
         sources.configure(store.profile)
         invalidate()
+        let excluded = Set(store.profile.excludedApps), enabled = store.profile.enabled
+        typing.releaseAccessibility { !enabled || excluded.contains($0) }
         guard store.profile.enabled else { tap.stop(); onStatus?("Приостановлено"); return }
         guard AXIsProcessTrusted() else {
             waitingForAccess = true; tap.stop(); onStatus?("Нужен «Универсальный доступ»"); return
@@ -61,15 +66,25 @@ final class Coordinator {
         onStatus?(sources.map == nil ? "Добавьте русскую и английскую раскладки в macOS" : "Работает локально")
     }
 
-    func stop() { tap.stop(); store.flush() }
+    func stop() { tap.stop(); typing.releaseAccessibility { _ in true }; store.flush() }
     func retry() { stoppedForFailure = false; sources.reload(); spell.retry(); apply() }
     func becameActive() { if waitingForAccess { apply() } }
     @objc private func appChanged() {
-        if waitingForAccess { apply() } else { invalidate(); tap.restartWord() }
+        if waitingForAccess { apply(); return }
+        // The caret in the new app may be inside existing text: corrected as usual, but not learned from.
+        invalidate(); tap.relocateWord(); preparePending = true
     }
     private func invalidate() { generation &+= 1; undoRecord = nil; typing.forget() }
 
-    private func halt(_ status: String) {
+    // Only where the user types, not in every app brought to the front.
+    private func prepareFront() {
+        preparePending = false
+        guard store.profile.enabled, let app = text.inputOwner(), app.processIdentifier != getpid(),
+              let id = app.bundleIdentifier, !store.profile.excludedApps.contains(id) else { return }
+        typing.prepare(app)
+    }
+
+    func halt(_ status: String) {
         undoRecord = nil; typing.forget(); stoppedForFailure = true
         tap.stop(replay: false)
         onStatus?(status)
@@ -77,6 +92,7 @@ final class Coordinator {
 
     private func key(_ code: UInt16, _ flags: Modifiers, _ repeated: Bool, _ typed: Typed?) -> Bool {
         generation &+= 1
+        if preparePending { prepareFront() }
         if !repeated && shortcut(code, flags) { return true }
         if !flags.intersection([.command, .control, .option]).isEmpty ||
             [UInt16(48), 51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126].contains(code) {
@@ -93,6 +109,19 @@ final class Coordinator {
                 InputDiagnostics.record("boundary became stale"); return
             }
             switch text.capture(boundary: true, exclusions: store.profile.excludedApps) {
+            case .field(let snapshot) where text.mayBeRecased(snapshot):
+                // Cocoa text views capitalize a sentence's first word on its space, asynchronously: let that land
+                // first, then correct the recased word, instead of racing it inside the transaction.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+                    guard let self else { return }
+                    guard generation == revision, active == nil else {
+                        stale += 1; InputDiagnostics.record("boundary became stale after recase wait"); return
+                    }
+                    guard case .field(let settled) = text.capture(boundary: true, exclusions: store.profile.excludedApps) else {
+                        InputDiagnostics.record("capture lost after recase wait"); return
+                    }
+                    correctField(settled, revision: revision)
+                }
             case .field(let snapshot): correctField(snapshot, revision: revision)
             case .blocked(let reason): InputDiagnostics.record("capture blocked reason=\(reason)")
             case .unreadable(let reason):
@@ -131,53 +160,6 @@ final class Coordinator {
         }
     }
 
-    // Unreadable fields: the word comes from the key events, the replacement from retyping it.
-    private func correctTyped(_ typed: Typed, revision: UInt64) {
-        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
-        InputDiagnostics.record("keys typed length=\(typed.retype.word.count)")
-        let started = spell.analyze(typed.retype.word, map: sources.map, protected: store.immune,
-                                    spelling: store.profile.spelling) { [weak self] correction, available in
-            guard let self else { return }
-            InputDiagnostics.record("keys analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
-            guard available else { onStatus?("Словари недоступны"); return }
-            guard generation == revision, active == nil else { stale += 1; return }
-            guard let correction, NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-                  let previous = sources.currentID, sources.entries.contains(where: { $0.id == previous }),
-                  let target = correction.kind == .layout ? sources.targetID(correction.language) : previous else { return }
-            switch typing.correct(typed, with: correction.replacement, source: target, previous: previous, pid: pid) {
-            case .posted:
-                corrections += 1; undoRecord = nil
-                onStatus?(correction.kind == .layout ? "Исправлена раскладка" : "Исправлена опечатка")
-            case .skipped: stale += 1
-            case .lost: halt("Отложенный ввод потерян при исправлении. Обработка остановлена.")
-            }
-        }
-        if !started { InputDiagnostics.record("keys analysis not started") }
-    }
-
-    // Posting inside the tap's synchronous chord callback would let keys typed after the chord overtake the burst,
-    // so a chord only decides here and the undo runs on the next main turn, gated and serial-checked.
-    private func undoTypedLater(then protecting: Bool) -> Bool {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let original = undoTyped(), protecting else { return }
-            protect(original)
-        }
-        return true
-    }
-
-    private func undoTyped() -> String? {
-        guard undoRecord == nil, active == nil, let undone = typing.undoLast() else { return nil }
-        switch undone.outcome {
-        case .posted:
-            undos += 1
-            store.update { $0.recordUndo(undone.original) }
-            onStatus?("Исходное слово и раскладка восстановлены")
-            return undone.original
-        case .skipped: return nil
-        case .lost: halt("Отложенный ввод потерян при отмене. Обработка остановлена."); return nil
-        }
-    }
-
     private func shortcut(_ code: UInt16?, _ flags: Modifiers) -> Bool {
         guard store.profile.enabled, active == nil else { return false }
         let undo = store.profile.undo, protectBinding = store.profile.protect
@@ -199,14 +181,14 @@ final class Coordinator {
         case .unreadable:
             if typing.canUndo { return undoTypedLater(then: true) }
             guard let typed = tap.typedWord().map(Retype.init(typed:)), Words.language(of: typed.word) != nil,
-                  let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+                  let pid = text.inputOwner()?.processIdentifier,
                   text.keystrokeRefusal(expecting: nil, pid: pid) == nil else { return false }
             protect(typed.word)
             return true
         }
     }
 
-    private func protect(_ word: String) {
+    func protect(_ word: String) {
         store.update { profile in
             let key = Words.normalized(word)
             if !profile.protectedWords.contains(key) { profile.protectedWords.append(key); profile.protectedWords.sort() }

@@ -27,20 +27,36 @@ final class FocusedText {
 
     init() { AXUIElementSetMessagingTimeout(system, 0.012) }
 
+    // The app that holds keyboard focus. A non-activating panel (Raycast or Spotlight opened by a hotkey) takes the
+    // keys while macOS still reports the previous app as frontmost: the panel's app is the one being typed into.
+    func inputOwner() -> NSRunningApplication? { owner(of: focused()) }
+
+    private func owner(of element: AXUIElement?) -> NSRunningApplication? {
+        var pid: pid_t = 0
+        if let element, AXUIElementGetPid(element, &pid) == .success,
+           let app = NSRunningApplication(processIdentifier: pid) { return app }
+        return NSWorkspace.shared.frontmostApplication
+    }
+
     func capture(boundary: Bool, exclusions: [String]) -> Capture {
-        InputDiagnostics.record("capture app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none") trusted=\(AXIsProcessTrusted()) secure=\(IsSecureEventInputEnabled())")
         guard AXIsProcessTrusted() else { return .blocked("untrusted") }
         guard !IsSecureEventInputEnabled() else { return .blocked("secure input") }
-        guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getpid(),
+        let focus = focused()
+        let owner = owner(of: focus)
+        InputDiagnostics.record("capture app=\(owner?.bundleIdentifier ?? "none") front=\(owner?.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier)")
+        guard let app = owner, app.processIdentifier != getpid(),
               let id = app.bundleIdentifier, !exclusions.contains(id) else { return .blocked("app") }
         guard Self.compatibleApps.contains(id) else { return .unreadable("app") }
-        guard let element = focused() else { return .unreadable("focus") }
+        guard let element = focus else { return .unreadable("focus") }
         let selection: NSRange
         switch inspect(element) {
         case .silent: return .unreadable("ax error")
         case .secure: return .blocked("secure field")
         case .unknown(let range):
             if boundary, let range, range.length > 0 { return .blocked("selection") }
+            return .unreadable("role")
+        case .loose(let range):
+            if boundary, range.length > 0 { return .blocked("selection") }
             return .unreadable("role")
         case .text(let range): selection = range
         }
@@ -65,27 +81,95 @@ final class FocusedText {
         return .field(TextSnapshot(element: element, pid: pid, selection: selection, word: word))
     }
 
-    // One read before a keystroke replacement, nil when allowed. AX silence allows it (Electron); a secure field,
-    // another process, a non-text focus, a selection or a readable field that no longer ends with `tail` refuses it.
-    func keystrokeRefusal(expecting tail: String?, pid: pid_t) -> String? {
+    // One read before a keystroke replacement, nil when allowed. For a blind word AX silence allows it (Electron);
+    // a word read from `field` (strict) is refused unless that same element answers and ends with `tail`. A secure
+    // field, another process, a non-text focus, a selection or a field that no longer ends with `tail` refuses both.
+    func keystrokeRefusal(expecting tail: String?, pid: pid_t, field: AXUIElement? = nil) -> String? {
+        let strict = field != nil
         guard !IsSecureEventInputEnabled() else { return "secure input" }
-        guard let element = focused() else { InputDiagnostics.record("keys focus unreadable"); return nil }
+        guard let element = focused() else {
+            if strict { return "field unverified" }
+            InputDiagnostics.record("keys focus unreadable"); return nil
+        }
+        if let field, !CFEqual(element, field) { return "focus moved to another element" }
         var owner: pid_t = 0
-        if AXUIElementGetPid(element, &owner) == .success, owner != pid { return "focus in another process" }
+        let ownerRead = AXUIElementGetPid(element, &owner) == .success
+        if ownerRead, owner != pid { return "focus in another process" }
+        if strict && !ownerRead { return "field unverified" }
         // Once per correction, not per key: a busy browser may need longer than the 12 ms default.
         AXUIElementSetMessagingTimeout(element, 0.05)
         switch inspect(element) {
-        case .silent: InputDiagnostics.record("keys field unreadable"); return nil
+        case .silent:
+            if strict { return "field unverified" }
+            InputDiagnostics.record("keys field unreadable"); return nil
         case .secure: return "secure field"
         case .unknown(nil): return "focus is not text"
-        case .unknown(let range?): return range.length == 0 ? nil : "selection"
-        case .text(let range):
+        case .unknown(let range?): return strict ? "field unverified" : range.length == 0 ? nil : "selection"
+        case .text(let range), .loose(let range):
             guard range.length == 0 else { return "selection" }
-            // macOS autocorrect or a text replacement may have rewritten the word on the same space.
-            guard let tail, range.location >= tail.utf16.count, let actual = text(element,
-                  range: NSRange(location: range.location - tail.utf16.count, length: tail.utf16.count)) else { return nil }
-            return actual == tail ? nil : "text changed"
+            // macOS autocorrect or a text replacement may have rewritten the word on the same space. A readable field
+            // that cannot show the tail does not get a blind burst either.
+            guard let tail else { return nil }
+            guard range.location >= tail.utf16.count else { return Self.lagging }
+            guard let actual = text(element, range: NSRange(location: range.location - tail.utf16.count,
+                                                            length: tail.utf16.count)) else { return "tail unreadable" }
+            // Contenteditable fields report a typed trailing space as a no-break space.
+            let shown = actual.replacingOccurrences(of: "\u{00A0}", with: " ")
+            if shown == tail { return nil }
+            return shown.last == " " ? "text changed" : Self.lagging
         }
+    }
+
+    // The field has not caught up with the typed keys yet (Electron): worth one more look shortly.
+    static let lagging = "field behind the keys"
+
+    // A lowercase word at the start of the field or after . ! ? or a line break: an editor with automatic
+    // capitalization may still recase it. One read of up to three characters before the word.
+    func mayBeRecased(_ snapshot: TextSnapshot) -> Bool {
+        guard let first = snapshot.word.word.first, first.isLowercase else { return false }
+        let start = snapshot.word.range.location
+        guard start > 0 else { return true }
+        let length = min(start, 3)
+        guard let before = text(snapshot.element, range: NSRange(location: start - length, length: length)) else { return false }
+        let trimmed = before.trimmingCharacters(in: .whitespaces)
+        guard let last = trimmed.last else { return before.contains(where: \.isNewline) || length < 3 }
+        return ".!?".contains(last) || last.isNewline
+    }
+
+    enum FieldRead {
+        // The field answered: what it shows for the typed run, the element, and whether its role is `loose`.
+        case read(TypedInField, AXUIElement, loose: Bool)
+        // The app's own focused element gave no text: an Electron app without its accessibility tree looks like this.
+        case unanswered(String)
+        // Nothing may be read or replaced here (secure, another process, a selection).
+        case refused(String)
+    }
+
+    // The word the space just ended, read from the field. Reads at most the word, its space and one character before.
+    func typedInField(_ typed: Retype, pid: pid_t) -> FieldRead {
+        guard !IsSecureEventInputEnabled() else { return .refused("secure input") }
+        guard let element = focused() else { return .unanswered("no focus") }
+        var owner: pid_t = 0
+        guard AXUIElementGetPid(element, &owner) == .success else { return .unanswered("no owner") }
+        guard owner == pid else { return .refused("focus in another process") }
+        AXUIElementSetMessagingTimeout(element, 0.05)
+        let range: NSRange, loose: Bool
+        switch inspect(element) {
+        case .text(let found): range = found; loose = false
+        case .loose(let found): range = found; loose = true
+        case .secure: return .refused("secure field")
+        case .unknown: return .unanswered("not text")
+        case .silent: return .unanswered("ax error")
+        }
+        guard range.length == 0 else { return .refused("selection") }
+        let length = min(range.location, Words.maximumLength + 2)
+        // Right after a typed space the caret cannot be at the start: the field has not caught up with the keys.
+        guard length > 0 else { return .read(.pending, element, loose: loose) }
+        guard let prefix = text(element, range: NSRange(location: range.location - length, length: length)) else {
+            return .unanswered("text read failed")
+        }
+        return .read(TypedInField.resolve(prefix: prefix, fromFieldStart: length == range.location, typed: typed),
+                     element, loose: loose)
     }
 
     func stillCurrent(_ snapshot: TextSnapshot, caret: NSRange? = nil, word: String? = nil) -> Bool {
@@ -164,7 +248,9 @@ final class FocusedText {
     }
 
     // `silent`: AX did not answer. `unknown(nil)`: AX answered and the focus has no text range, so it is not text.
-    private enum Field { case text(NSRange), secure, unknown(NSRange?), silent }
+    // `loose`: a text role whose subrole is not one the AX transaction was checked with (Raycast's field): good for
+    // reading before blind keys, never for AX writes.
+    private enum Field { case text(NSRange), loose(NSRange), secure, unknown(NSRange?), silent }
 
     private func inspect(_ element: AXUIElement) -> Field {
         let names = [kAXRoleAttribute, kAXSubroleAttribute, kAXSelectedTextRangeAttribute] as CFArray
@@ -182,10 +268,10 @@ final class FocusedText {
         if let subrole {
             InputDiagnostics.record("AX role=\(role) subrole=\(subrole)")
             guard subrole == kAXSearchFieldSubrole as String || (role == kAXTextAreaRole as String && subrole.isEmpty) else {
-                return .unknown(range)
+                return .loose(range)
             }
         } else if role != kAXTextAreaRole as String || !Self.missing(values[1]) {
-            return .unknown(range)
+            return .loose(range)
         }
         return .text(range)
     }

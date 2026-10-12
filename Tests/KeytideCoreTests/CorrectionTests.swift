@@ -48,6 +48,34 @@ final class CorrectionTests: XCTestCase {
         ))
     }
 
+    // The apostrophe key is "э" in the Russian layout: let's typed there arrives as "дуеэы".
+    func testEnglishContractionsAreWordsAndStrayApostrophesAreNot() {
+        for word in ["let's", "Let's", "LET'S", "I'M", "don't", "can't", "won't", "I'm", "it's", "we're", "they've",
+                     "I'll", "you'd"] {
+            XCTAssertTrue(Words.isCandidate(word), word)
+        }
+        // The layout map yields only the ASCII apostrophe; a typographic one is not a contraction here.
+        for word in ["s'd", "x'm", "k'gnjg", "'nj", "let'", "rock'n'roll", "abc'x", "ca't", "при'вет", "let''s",
+                     "let\u{2019}s"] {
+            XCTAssertFalse(Words.isCandidate(word), word)
+        }
+        XCTAssertTrue(Words.isCandidate("привет"))
+        XCTAssertFalse(Words.isCandidate("при-вет"))
+    }
+
+    func testDecisionAcceptsContractionTypedInTheRussianLayout() {
+        XCTAssertEqual(LayoutMap.qwerty.convert("дуеэы", to: .en), "let's")
+        XCTAssertEqual(LayoutMap.qwerty.convert("Шэь", to: .en), "I'm")
+        let accepted = Decision.choose(word: "дуеэы", original: WordVerdict(known: false), alternate: "let's",
+                                       alternateVerdict: WordVerdict(known: true), protected: [], spelling: true)
+        XCTAssertEqual(accepted?.replacement, "let's")
+        XCTAssertEqual(accepted?.language, .en)
+        XCTAssertEqual(accepted?.kind, .layout)
+        XCTAssertNil(Decision.choose(word: "ыэв", original: WordVerdict(known: false), alternate: "s'd",
+                                     alternateVerdict: WordVerdict(known: true), protected: [], spelling: true),
+                     "the macOS checker accepts s'd, so the shape must be a real contraction")
+    }
+
     func testDecisionRejectsAlternateFromTheWrongLanguage() {
         XCTAssertNil(Decision.choose(
             word: "helo",

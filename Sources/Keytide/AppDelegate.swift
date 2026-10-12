@@ -44,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Настройки...", #selector(openSettings), to: menu)
         add("Проверить доступ", #selector(retry), to: menu)
         add("Проверить обновления", #selector(checkUpdates), to: menu)
+        if WhatsNew.available { add("Что нового", #selector(whatsNew), to: menu) }
         menu.addItem(.separator())
         add("Выйти из Keytide", #selector(quit), to: menu)
     }
@@ -51,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func install() { updater.install() }
     @objc private func openRelease() { if case .manual(_, let page) = updater.latest { NSWorkspace.shared.open(page) } }
     @objc private func checkUpdates() { updater.check(manual: true) }
+    @objc private func whatsNew() { WhatsNew.show() }
     @objc private func openSettings() {
         if settings == nil { settings = SettingsWindow(store: store, engine: engine, updater: updater) }
         settings?.show(status); settings?.open()

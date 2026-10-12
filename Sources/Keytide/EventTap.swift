@@ -1,10 +1,14 @@
 import AppKit
 import KeytideCore
 
-// A word finished by a space, with the input serial at that space.
+// A word finished by a space, with the input serial at that space. `edited`: it started after a click, a caret key,
+// a chord, an app switch or a Backspace past its start, so it may be the end of a longer word the key stream never
+// saw. `field`: the word was read from this element; the burst is then refused unless that element confirms it.
 struct Typed {
     let retype: Retype
     let serial: UInt64
+    var edited = false
+    var field: AXUIElement?
 }
 
 final class EventTap {
@@ -47,12 +51,12 @@ final class EventTap {
 
     func serial() -> UInt64 { lock.lock(); defer { lock.unlock() }; return inputSerial }
     func typedWord() -> String? { lock.lock(); defer { lock.unlock() }; return word.current }
-    // App switch or tap start: the caret may be anywhere, what is typed next is a new word.
-    func restartWord() { lock.lock(); word.restart(); lock.unlock() }
+    // App switch or tap start: the caret may be anywhere, what is typed next is a new word marked as an edit.
+    func relocateWord() { lock.lock(); word.relocate(); lock.unlock() }
 
     func start() -> Bool {
         guard port == nil else { return true }
-        restartWord()
+        relocateWord()
         let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged, .leftMouseDown, .rightMouseDown,
                                   .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp, .scrollWheel]
         let mask = types.reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
@@ -213,11 +217,18 @@ final class EventTap {
         case .keyDown:
             inputSerial &+= 1
             let serial = inputSerial
-            return word.key(code, flags, text: Self.text(event)).map { Typed(retype: $0, serial: serial) }
+            guard let retype = word.key(code, flags, text: Self.text(event)) else {
+                // A plain space after a word whose characters the keys could not show: only a readable field can
+                // name it. An empty word (double space) needs no field read at all.
+                guard code == 49, flags.intersection([.command, .control, .option]).isEmpty,
+                      word.finishedUnknown else { return nil }
+                return Typed(retype: Retype(word: "", suffix: ""), serial: serial, edited: true)
+            }
+            return Typed(retype: retype, serial: serial, edited: word.finishedAfterEdit)
         case .keyUp, .flagsChanged, .scrollWheel: return nil
         default:
-            // A click may move the caret: refuse a pending correction, and what follows is a new word.
-            inputSerial &+= 1; word.restart(); return nil
+            // A click may move the caret into existing text: refuse a pending correction, and what follows is an edit.
+            inputSerial &+= 1; word.relocate(); return nil
         }
     }
 

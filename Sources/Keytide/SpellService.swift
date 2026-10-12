@@ -44,7 +44,7 @@ final class SpellService {
                 if !original.known {
                     let alternate = map?.convert(word, to: language == .en ? .ru : .en)
                     let alternateVerdict = alternate.flatMap {
-                        guard Words.isPlain($0) else { return nil as WordVerdict? }
+                        guard Words.isCandidate($0) else { return nil as WordVerdict? }
                         // Profile recognition is request-local: removing a word must take effect without retry.
                         return protected.contains(Words.normalized($0)) ? WordVerdict(known: true) :
                             verdict($0, language: language == .en ? .ru : .en, correction: false)

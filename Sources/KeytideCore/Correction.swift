@@ -76,6 +76,19 @@ public enum Words {
         return word.unicodeScalars.allSatisfy { CharacterSet.letters.contains($0) }
     }
 
+    // A layout alternate may be a plain word or an English contraction: the apostrophe key is "э" in the Russian
+    // layout, so let's typed there arrives as "дуеэы".
+    public static func isCandidate(_ word: String) -> Bool { isPlain(word) || isEnglishContraction(word) }
+
+    // One apostrophe and a common ending only: the macOS checker also accepts stray shapes like "s'd".
+    public static func isEnglishContraction(_ word: String) -> Bool {
+        let parts = word.lowercased().split(separator: "'", omittingEmptySubsequences: false)
+        guard parts.count == 2, let stem = parts.first, let ending = parts.last,
+              !stem.isEmpty, stem.unicodeScalars.allSatisfy({ (97...122).contains($0.value) }),
+              ["s", "t", "re", "ve", "ll", "d", "m"].contains(ending), stem.count >= 2 || stem == "i" else { return false }
+        return ending != "t" || stem.hasSuffix("n")
+    }
+
     public static func applyCase(of original: String, to word: String) -> String {
         if original == original.uppercased() { return word.uppercased() }
         if original == original.capitalized { return word.capitalized }
@@ -105,7 +118,7 @@ public enum Decision {
         guard word.utf16.count >= 2, let source = Words.language(of: word),
               !protected.contains(Words.normalized(word)), !original.known else { return nil }
         let target: Language = source == .en ? .ru : .en
-        if let alternate, Words.language(of: alternate) == target, Words.isPlain(alternate),
+        if let alternate, Words.language(of: alternate) == target, Words.isCandidate(alternate),
            alternateVerdict?.known == true || protected.contains(Words.normalized(alternate)) {
             return Correction(original: word, replacement: alternate, language: target, kind: .layout)
         }

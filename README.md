@@ -6,13 +6,13 @@ Type `ghbdtn ` and get `привет `, type `руддщ ` and get `hello `: aft
 
 ## Features
 
-- Wrong-layout words corrected after a space, both directions, from two letters (`lf` -> `да`). Case is kept.
+- Wrong-layout words corrected after a space, both directions, from two letters (`lf` -> `да`). Case is kept. English contractions typed in the Russian layout are fixed too (`дуеэы` -> `let's`).
 - Obvious typos corrected from three letters, only when the fix is one edit away.
 - Single Option undoes the last correction and restores the previous layout. Control+D protects a word from corrections. Both shortcuts are configurable.
 - Protected words also work as layout targets: protect `локи` and `kjrb` becomes `локи`.
 - Optional learning: two undos of the same word stop correcting it. Learned words can be reviewed and forgotten in Settings.
 - Excluded apps (terminals and code editors by default), pause, launch at login, profile export and import.
-- Updates itself on one click from the menu and keeps the Accessibility permission (from 0.1.1).
+- Updates itself on one click from the menu and keeps the Accessibility permission (from 0.1.1). After an update, Settings shows what changed in plain words once (also under "Что нового" in the menu).
 - Bundled RU/EN dictionary of about 1.5 million word forms in a 1.4 MB memory-mapped index; the macOS spell checker handles everything else.
 
 ## How it works
@@ -21,6 +21,7 @@ Keytide needs the macOS Accessibility permission to see key presses and edit tex
 
 - In TextEdit, Safari, Chrome, Helium and Codex it reads the field, checks the word and the caret, and replaces the word in a verified transaction.
 - Everywhere else it remembers only the word being typed (up to 64 characters, reset at every space) and, after the space, deletes it with Backspace and types the correction. Return never triggers a correction, so a message is sent as typed.
+- Where such a field can still be read (Raycast, most native apps, Electron apps like Claude desktop), Keytide reads the word before the caret at the space, so a word is corrected whole wherever it stands, even when you finish an existing word, and fragments are never learned. For Electron apps it turns on their accessibility tree (`AXManualAccessibility`) at the first key you type there, never in password managers, and turns it off again when Keytide quits or the app is excluded; this costs that app about 20 MB. Where a field cannot be read at all, the typed word is still corrected, but undoing a word that started after a click, an arrow key or a Backspace past its start teaches Keytide nothing, since it may be part of a longer word.
 - Nothing is corrected under Secure Input, in password fields, in excluded apps, when the focus is not a text field, when text is selected, or when anything was pressed after the space.
 
 No text history, clipboard or telemetry. Diagnostics are opt-in and log stages and lengths, never words.
