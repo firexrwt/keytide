@@ -64,6 +64,15 @@ final class UpdateTests: XCTestCase {
         XCTAssertEqual(ReleaseInfo.check(release(size: "big"), current: current), manual)
     }
 
+    func testLatestNamesThePublishedVersionEvenWhenItIsNotNewer() {
+        XCTAssertEqual(ReleaseInfo.latest(release(tag: "v0.1.1", name: "Keytide-0.1.1.dmg")), Version("0.1.1"))
+        XCTAssertEqual(ReleaseInfo.latest(release()), Version("0.1.2"))
+        XCTAssertNil(ReleaseInfo.latest(release(draft: true)))
+        XCTAssertNil(ReleaseInfo.latest(release(tag: "0.1.2")))
+        XCTAssertNil(ReleaseInfo.latest(Data("junk".utf8)))
+        XCTAssertNil(ReleaseInfo.latest(release(padding: 1_100_000)))
+    }
+
     func testJunkAndOversizedResponsesAreIgnored() {
         XCTAssertEqual(ReleaseInfo.check(Data("not json".utf8), current: current), .current)
         XCTAssertEqual(ReleaseInfo.check(Data("[1, 2]".utf8), current: current), .current)

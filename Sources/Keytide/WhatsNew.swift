@@ -7,7 +7,7 @@ enum WhatsNew {
     private static let seenKey = "WhatsNewSeen"
     private static var version: String? { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String }
 
-    static var available: Bool { version.flatMap(ReleaseNotes.lines) != nil }
+    static var available: Bool { version.flatMap { ReleaseNotes.lines(for: $0, language: L10n.language) } != nil }
 
     // Not while Settings is open for the first-run Accessibility setup: that window has its own job.
     static func showOnce(attachedTo window: NSWindow) {
@@ -25,11 +25,11 @@ enum WhatsNew {
     }
 
     private static func alert(_ version: String) -> NSAlert? {
-        guard let lines = ReleaseNotes.lines(for: version) else { return nil }
+        guard let lines = ReleaseNotes.lines(for: version, language: L10n.language) else { return nil }
         let alert = NSAlert()
-        alert.messageText = "Что нового в Keytide \(version)"
+        alert.messageText = tr("whatsNew.title", version)
         alert.informativeText = lines.map { "• " + $0 }.joined(separator: "\n\n")
-        alert.addButton(withTitle: "Понятно")
+        alert.addButton(withTitle: tr("whatsNew.ok"))
         return alert
     }
 }

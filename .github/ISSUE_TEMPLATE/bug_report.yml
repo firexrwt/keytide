@@ -1,0 +1,49 @@
+name: Bug report / Сообщить об ошибке
+description: Something went wrong while typing, correcting or updating. / Что-то пошло не так при наборе, исправлении или обновлении.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keytide > Settings > About > Report a Bug fills in the version and macOS. Please attach the report from Save Report... It has no typed text, but it lists app IDs and timings, and issues here are public: open the file and check it first.
+        Keytide > Настройки > О приложении > «Сообщить об ошибке» заполняет версию и macOS. Приложите отчёт из «Сохранить отчёт...». Набранного текста в нём нет, но есть ID приложений и время событий, а сообщения здесь публичные: сначала откройте файл и проверьте его.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / Что произошло
+      placeholder: "I typed ghbdtn and a space in Telegram, nothing changed. / Набрал ghbdtn и пробел в Telegram, ничего не изменилось."
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App where it happened / В каком приложении
+      placeholder: Telegram, Safari, Raycast...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to repeat / Как повторить
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected / Что ожидали
+  - type: input
+    id: version
+    attributes:
+      label: Keytide version / Версия Keytide
+      placeholder: 0.1.3 (4)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS
+      placeholder: 15.5, Apple Silicon
+  - type: textarea
+    id: report
+    attributes:
+      label: Report / Отчёт
+      description: Drag Keytide-report.txt here. / Перетащите сюда Keytide-report.txt.

@@ -43,9 +43,10 @@ final class FocusedText {
         guard !IsSecureEventInputEnabled() else { return .blocked("secure input") }
         let focus = focused()
         let owner = owner(of: focus)
-        InputDiagnostics.record("capture app=\(owner?.bundleIdentifier ?? "none") front=\(owner?.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier)")
+        // Excluded apps and Keytide itself leave no trace, not even their ID.
         guard let app = owner, app.processIdentifier != getpid(),
               let id = app.bundleIdentifier, !exclusions.contains(id) else { return .blocked("app") }
+        InputDiagnostics.record("capture app=\(id) front=\(app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier)")
         guard Self.compatibleApps.contains(id) else { return .unreadable("app") }
         guard let element = focus else { return .unreadable("focus") }
         let selection: NSRange
@@ -204,7 +205,7 @@ final class FocusedText {
                 return index
             }
         }
-        InputDiagnostics.record("field state mismatch selection=\(actual)")
+        InputDiagnostics.record("field state mismatch")
         return nil
     }
 
@@ -266,7 +267,9 @@ final class FocusedText {
         guard let role = values[0] as? String, [kAXTextFieldRole as String, kAXTextAreaRole as String].contains(role),
               let range else { return .unknown(range) }
         if let subrole {
-            InputDiagnostics.record("AX role=\(role) subrole=\(subrole)")
+            // The subrole comes from the other app: only known values are logged.
+            let known = [kAXSearchFieldSubrole as String, kAXSecureTextFieldSubrole as String, ""].contains(subrole)
+            InputDiagnostics.record("AX role=\(role) subrole=\(known ? subrole : "other")")
             guard subrole == kAXSearchFieldSubrole as String || (role == kAXTextAreaRole as String && subrole.isEmpty) else {
                 return .loose(range)
             }

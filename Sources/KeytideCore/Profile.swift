@@ -112,10 +112,11 @@ public struct Profile: Codable, Equatable {
 
 public enum ProfileError: LocalizedError {
     case unsupported, tooLarge
+    // Looked up in the app's Localizable.strings (Bundle.main) at run time.
     public var errorDescription: String? {
         switch self {
-        case .unsupported: return "Поврежденный профиль или неподдерживаемая версия."
-        case .tooLarge: return "Профиль превышает 1 МБ."
+        case .unsupported: return NSLocalizedString("profile.error.unsupported", comment: "")
+        case .tooLarge: return NSLocalizedString("profile.error.tooLarge", comment: "")
         }
     }
 }

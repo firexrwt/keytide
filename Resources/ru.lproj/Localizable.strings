@@ -1,0 +1,142 @@
+/* Строки интерфейса Keytide, русский. Те же ключи, что в en.lproj; их сверяет LocalizationTests. */
+
+/* Меню */
+"app.starting" = "Запуск...";
+"menu.update" = "Обновить до %@";
+"menu.openRelease" = "Открыть релиз %@ на GitHub";
+"menu.pause" = "Приостановить";
+"menu.resume" = "Включить";
+"menu.settings" = "Настройки...";
+"menu.checkAccess" = "Проверить доступ";
+"menu.checkUpdates" = "Проверить обновления...";
+"menu.whatsNew" = "Что нового";
+"menu.about" = "О Keytide";
+"menu.quit" = "Выйти из Keytide";
+
+/* Строка статуса */
+"status.paused" = "Приостановлено";
+"status.needsAccess" = "Нужен «Универсальный доступ»";
+"status.tapRefused" = "macOS не разрешила обработку клавиатуры. Проверьте доступ.";
+"status.tapStopped" = "macOS остановила обработку клавиатуры. Нажмите «Проверить доступ».";
+"status.addLayouts" = "Добавьте русскую и английскую раскладки в macOS";
+"status.running" = "Работает локально";
+"status.dictionariesUnavailable" = "Словари недоступны";
+"status.layoutFixed" = "Исправлена раскладка";
+"status.typoFixed" = "Исправлена опечатка";
+"status.dictionaryFull" = "Словарь заполнен";
+"status.protected" = "Слово защищено от исправлений";
+"status.restored" = "Исходное слово и раскладка восстановлены";
+"status.skipped" = "Исправление пропущено, исходный ввод сохранен";
+"status.halt.uncertain" = "Исход исправления не подтвержден. Обработка остановлена, отложенный ввод отменен.";
+"status.halt.lostCorrection" = "Отложенный ввод потерян при исправлении. Обработка остановлена.";
+"status.halt.lostUndo" = "Отложенный ввод потерян при отмене. Обработка остановлена.";
+
+/* Обновления */
+"update.busy" = "Keytide уже обращается к GitHub, подождите";
+"update.unknownVersion" = "Версия сборки неизвестна, обновления не проверяются";
+"update.httpStatus" = "GitHub ответил %@";
+"update.offline" = "Нет связи с GitHub";
+"update.unreadable" = "Не удалось разобрать ответ GitHub. Попробуйте позже.";
+"update.failed.title" = "Не удалось проверить обновления";
+"update.current.title" = "Установлена последняя версия";
+"update.current.text" = "На этом Mac: %1$@. На GitHub: %2$@.";
+"update.available.title" = "Доступна версия %@";
+"update.available.text" = "У вас %@. Обновление сохранит разрешение «Универсальный доступ» и перезапустит Keytide.";
+"update.install" = "Обновить";
+"update.later" = "Позже";
+"update.manual.title" = "Вышла версия %@";
+"update.manual.text" = "Её нельзя установить из меню. У вас %@.";
+"update.openRelease" = "Открыть релиз";
+"update.ok" = "Понятно";
+"update.downloading" = "Загрузка Keytide %@...";
+"update.installedRestart" = "Keytide %@ установлен, перезапустите приложение";
+"update.rejected" = "Обновление отклонено: %@. Не устанавливайте эту версию вручную.";
+"update.notInstalled" = "Обновление не установлено: %@. Открыта страница релиза.";
+"update.notInstalled.title" = "Обновление не установлено";
+"update.checking" = "Проверка обновлений...";
+"install.unsigned" = "автообновление работает только у сборки, подписанной сертификатом";
+"install.download" = "не удалось скачать обновление";
+"install.image" = "образ обновления повреждён или в нём нет Keytide.app";
+"install.signature" = "подпись обновления не совпадает с установленной версией";
+"install.copy" = "не удалось скопировать обновление рядом с приложением";
+"install.replace" = "не удалось заменить приложение (нет прав на его папку)";
+
+/* Что нового */
+"whatsNew.title" = "Что нового в Keytide %@";
+"whatsNew.ok" = "Понятно";
+
+/* Сочетания */
+"shortcut.help" = "Нажмите и введите сочетание клавиш. Escape отменяет запись.";
+"shortcut.recording" = "Нажмите клавиши...";
+"shortcut.alone" = "отдельно";
+
+/* Профиль */
+"profile.restoredFields" = "В профиле восстановлены поля: %@";
+"profile.saveFailed" = "Не удалось сохранить профиль: %@";
+"profile.error.unsupported" = "Поврежденный профиль или неподдерживаемая версия.";
+"profile.error.tooLarge" = "Профиль превышает 1 МБ.";
+
+/* Настройки: вкладки и «Основные» */
+"settings.tab.general" = "Основные";
+"settings.tab.words" = "Слова";
+"settings.tab.about" = "О приложении";
+"settings.header" = "Раскладка под контролем";
+"settings.grantAccess" = "Разрешить доступ";
+"settings.checkAccess" = "Проверить доступ";
+"settings.login" = "Запускать при входе в систему";
+"settings.autoUpdates" = "Проверять обновления автоматически (раз в сутки, GitHub)";
+"settings.spelling" = "Исправлять очевидные опечатки";
+"settings.learning" = "Учиться на повторных отменах";
+"settings.learning.note" = "После двух отмен слово перестанет исправляться. История текста не хранится.";
+"settings.hotkeys" = "Горячие клавиши";
+"settings.undo" = "Отмена";
+"settings.protectWord" = "Защитить слово";
+"settings.hotkeys.note" = "Нажмите кнопку и введите сочетание. Одиночный модификатор тоже поддерживается.\nГлобальные сочетания могут перекрывать команды редактора.";
+"settings.shortcutTaken" = "Это сочетание уже занято.";
+"settings.undo.a11y" = "Сочетание для отмены исправления";
+"settings.protect.a11y" = "Сочетание для защиты слова";
+"settings.login.error" = "Автозапуск: %@";
+"settings.login.approve" = "Разрешите Keytide в «Объекты входа» Системных настроек.";
+"settings.login.unchanged" = "Автозапуск не изменился, состояние macOS: %@";
+
+/* Настройки: «Слова» */
+"words.protected" = "Защищенные слова";
+"words.placeholder" = "Слово без пробелов";
+"words.field.a11y" = "Слово для защиты";
+"words.add" = "Добавить";
+"words.remove" = "Удалить";
+"words.learned" = "Выученные: не исправляются после двух отмен";
+"words.learned.list" = "Выученные слова";
+"words.forget" = "Забыть";
+"words.forgetAll" = "Забыть все";
+"words.exclusions" = "Исключения: bundle ID приложений через запятую";
+"words.exclusions.a11y" = "Исключенные приложения";
+"words.save" = "Сохранить";
+"words.export" = "Экспорт профиля";
+"words.import" = "Импорт профиля";
+"words.profile.note" = "Профиль содержит словари, настройки и данные обучения. Всё хранится на этом Mac.";
+"words.invalidWord" = "Введите одно слово до 64 символов.";
+"words.invalidApps" = "Проверьте bundle ID приложений.";
+"words.exported" = "Профиль экспортирован.";
+"words.imported" = "Профиль импортирован.";
+
+/* Настройки: «О приложении» */
+"about.tagline" = "Бесплатный локальный переключатель раскладки RU/EN и корректор опечаток.";
+"about.version" = "Версия %1$@ (сборка %2$@)";
+"about.signed" = "Подписано сертификатом Keytide";
+"about.adhoc" = "Подпись ad-hoc: без автообновления";
+"about.signedOther" = "Подписано другим сертификатом: неофициальная сборка";
+"about.system" = "macOS %1$@, %2$@";
+"about.links" = "Ссылки";
+"about.site" = "Разработчик: firexrwt.com";
+"about.repo" = "Исходный код на GitHub";
+"about.releases" = "Все версии";
+"about.license" = "Лицензия MIT";
+"about.checkUpdates" = "Проверить обновления...";
+"about.help" = "Помощь и диагностика";
+"about.diagnostics" = "Подробная диагностика до выхода из Keytide (этапы и длины, без текста)";
+"about.saveReport" = "Сохранить отчёт...";
+"about.reportBug" = "Сообщить об ошибке";
+"about.report.note" = "В отчёте нет набранного текста: версии, настройки, количества, ID приложений и этапы диагностики со временем. Сообщения на GitHub публичные: откройте файл и проверьте его перед отправкой.";
+"about.reportSaved" = "Отчёт сохранён.";
+"about.reportFailed" = "Не удалось сохранить отчёт: %@";

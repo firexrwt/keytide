@@ -8,8 +8,10 @@ final class Updater {
     private static let automaticKey = "CheckForUpdates", lastCheckKey = "LastUpdateCheck"
     private static let due: TimeInterval = 72_000
     let current = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).flatMap(Version.init)
-    // An automatic check only changes the menu; status text is for checks the user asked for.
+    // An automatic check only changes the menu; a window answers checks the user asked for.
     private(set) var latest = ReleaseCheck.current
+    // The newest published version from the last full answer, so a 304 can still name it.
+    private var published: Version?
     var onStatus: ((String) -> Void)?
     private let session: URLSession
     private let installer = UpdateInstaller()
@@ -53,58 +55,70 @@ final class Updater {
         if automatic, Date().timeIntervalSince(last) > Self.due { check(manual: false) }
     }
 
-    func check(manual: Bool) {
-        guard !busy else { if manual { onStatus?("Keytide уже обращается к GitHub, подождите") }; return }
-        guard let current else { if manual { onStatus?("Версия сборки неизвестна, обновления не проверяются") }; return }
+    // `answered`: called on main once the request is over (before any alert), so a caller can clear its "checking".
+    func check(manual: Bool, answered: (() -> Void)? = nil) {
+        guard !busy else { if manual { onStatus?(tr("update.busy")) }; answered?(); return }
+        guard let current else { answered?(); if manual { UpdateAlert.failed(tr("update.unknownVersion")) }; return }
         busy = true
         var request = URLRequest(url: Self.endpoint)
         if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         session.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async { self?.finish(data, response as? HTTPURLResponse, error, manual: manual, current: current) }
+            DispatchQueue.main.async {
+                answered?()
+                self?.finish(data, response as? HTTPURLResponse, error, manual: manual, current: current)
+            }
         }.resume()
     }
 
     private func finish(_ data: Data?, _ response: HTTPURLResponse?, _ error: Error?, manual: Bool, current: Version) {
         busy = false
         guard error == nil, let response, response.statusCode == 200 || response.statusCode == 304 else {
-            let reason = response.map { "GitHub ответил \($0.statusCode)" } ?? "Нет связи с GitHub"
-            UpdateInstaller.log.error("check failed: \(reason, privacy: .public)")
-            if manual { onStatus?("\(reason), обновления не проверены") }
+            let code = response.map { "HTTP \($0.statusCode)" } ?? "offline"
+            UpdateInstaller.log.error("check failed: \(code, privacy: .public)")
+            InputDiagnostics.note("update check failed: \(code)")
+            if manual { UpdateAlert.failed(response.map { tr("update.httpStatus", String($0.statusCode)) } ?? tr("update.offline")) }
             return
         }
         UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey)
         if response.statusCode == 200, let data {
             etag = response.value(forHTTPHeaderField: "ETag")
             latest = ReleaseInfo.check(data, current: current)
+            published = ReleaseInfo.latest(data)
         }
         guard manual else { return }
+        // "Up to date" only when GitHub's answer named a version; otherwise say it could not be read.
+        guard published != nil else { UpdateAlert.failed(tr("update.unreadable")); return }
         switch latest {
-        case .current: onStatus?("Установлена последняя версия \(current)")
-        case .update(let release): onStatus?("Доступна версия \(release.version), обновление - в меню")
-        case .manual(let version, _): onStatus?("Вышла версия \(version), но её нельзя установить из меню")
+        case .current: UpdateAlert.current(current, published: published)
+        case .update(let release): UpdateAlert.available(release, current: current) { install(release) }
+        case .manual(let version, let page): UpdateAlert.manual(version, page: page, current: current)
         }
     }
 
-    func install() {
-        guard case .update(let release) = latest else { return }
-        guard !busy else { onStatus?("Keytide уже обращается к GitHub, подождите"); return }
+    // `shown`: the release the alert offered; the menu item installs whatever is current.
+    func install(_ shown: ReleaseInfo? = nil) {
+        guard case .update(let release) = latest, shown == nil || shown == release else { return }
+        guard !busy else { onStatus?(tr("update.busy")); return }
         busy = true
-        onStatus?("Загрузка Keytide \(release.version)...")
+        onStatus?(tr("update.downloading", release.version.description))
         installer.install(release) { [weak self] failure in
             guard let self else { return }
             busy = false
             guard let failure else {
                 latest = .current
                 if UpdateInstaller.relaunch(Bundle.main.bundleURL) { NSApp.terminate(nil) }
-                else { onStatus?("Keytide \(release.version) установлен, перезапустите приложение") }
+                else { onStatus?(tr("update.installedRestart", release.version.description)) }
                 return
             }
             // A file that fails the signature check is not something to install by hand either.
+            // A window as well as the status line: the user asked for this update and must see why it did not happen.
             if failure == .signature || failure == .image {
-                onStatus?("Обновление отклонено: \(failure.rawValue). Не устанавливайте эту версию вручную.")
+                onStatus?(tr("update.rejected", failure.message))
+                UpdateAlert.failed(tr("update.rejected", failure.message), title: tr("update.notInstalled.title"))
             } else {
-                onStatus?("Обновление не установлено: \(failure.rawValue). Открыта страница релиза.")
+                onStatus?(tr("update.notInstalled", failure.message))
                 NSWorkspace.shared.open(release.page)
+                UpdateAlert.failed(tr("update.notInstalled", failure.message), title: tr("update.notInstalled.title"))
             }
         }
     }

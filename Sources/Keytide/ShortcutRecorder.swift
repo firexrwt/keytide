@@ -2,7 +2,7 @@ import AppKit
 import KeytideCore
 
 final class ShortcutRecorder: NSButton {
-    var binding = Shortcut.undo { didSet { if monitor == nil { title = binding.label; setAccessibilityValue(title) } } }
+    var binding = Shortcut.undo { didSet { if monitor == nil { title = Self.title(binding); setAccessibilityValue(title) } } }
     var onCapture: ((Shortcut) -> Bool)?
     private var monitor: Any?
     private var modifierTap = ModifierTap()
@@ -13,9 +13,14 @@ final class ShortcutRecorder: NSButton {
         super.init(frame: .zero)
         bezelStyle = .rounded
         target = self; action = #selector(record)
-        title = binding.label
+        title = Self.title(binding)
         setAccessibilityValue(title)
-        setAccessibilityHelp("Нажмите и введите сочетание клавиш. Escape отменяет запись.")
+        setAccessibilityHelp(tr("shortcut.help"))
+    }
+
+    // A lone modifier reads "⌥ alone".
+    static func title(_ shortcut: Shortcut) -> String {
+        shortcut.keyCode == nil ? shortcut.label + " " + tr("shortcut.alone") : shortcut.label
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
     deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
@@ -23,7 +28,7 @@ final class ShortcutRecorder: NSButton {
     @objc private func record() {
         stop()
         window?.makeFirstResponder(self)
-        title = "Нажмите клавиши..."
+        title = tr("shortcut.recording")
         setAccessibilityValue(title)
         previous = []; modifierTap = ModifierTap()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
@@ -53,7 +58,7 @@ final class ShortcutRecorder: NSButton {
     override func resignFirstResponder() -> Bool { stop(); return true }
     private func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil; title = binding.label
+        monitor = nil; title = Self.title(binding)
         setAccessibilityValue(title)
     }
     static func modifiers(_ flags: NSEvent.ModifierFlags) -> Modifiers {

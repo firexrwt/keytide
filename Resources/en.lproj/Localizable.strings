@@ -1,0 +1,142 @@
+/* Keytide interface strings, English. Same keys as ru.lproj; LocalizationTests keeps them in step. */
+
+/* Menu */
+"app.starting" = "Starting...";
+"menu.update" = "Update to %@";
+"menu.openRelease" = "Open Release %@ on GitHub";
+"menu.pause" = "Pause";
+"menu.resume" = "Resume";
+"menu.settings" = "Settings...";
+"menu.checkAccess" = "Check Access";
+"menu.checkUpdates" = "Check for Updates...";
+"menu.whatsNew" = "What's New";
+"menu.about" = "About Keytide";
+"menu.quit" = "Quit Keytide";
+
+/* Status line */
+"status.paused" = "Paused";
+"status.needsAccess" = "Accessibility permission needed";
+"status.tapRefused" = "macOS did not allow keyboard processing. Check access.";
+"status.tapStopped" = "macOS stopped keyboard processing. Click Check Access.";
+"status.addLayouts" = "Add the Russian and English layouts in macOS";
+"status.running" = "Working locally";
+"status.dictionariesUnavailable" = "Dictionaries unavailable";
+"status.layoutFixed" = "Layout corrected";
+"status.typoFixed" = "Typo corrected";
+"status.dictionaryFull" = "The word list is full";
+"status.protected" = "Word protected from corrections";
+"status.restored" = "Original word and layout restored";
+"status.skipped" = "Correction skipped, your input kept";
+"status.halt.uncertain" = "The correction could not be confirmed. Processing stopped, held input discarded.";
+"status.halt.lostCorrection" = "Held input was lost during a correction. Processing stopped.";
+"status.halt.lostUndo" = "Held input was lost during an undo. Processing stopped.";
+
+/* Updates */
+"update.busy" = "Keytide is already talking to GitHub, please wait";
+"update.unknownVersion" = "This build has no version, updates are not checked";
+"update.httpStatus" = "GitHub answered %@";
+"update.offline" = "No connection to GitHub";
+"update.unreadable" = "GitHub's answer could not be read. Try again later.";
+"update.failed.title" = "Could not check for updates";
+"update.current.title" = "Keytide is up to date";
+"update.current.text" = "This Mac: %1$@. On GitHub: %2$@.";
+"update.available.title" = "Keytide %@ is available";
+"update.available.text" = "You have %@. The update keeps the Accessibility permission and restarts Keytide.";
+"update.install" = "Update";
+"update.later" = "Later";
+"update.manual.title" = "Keytide %@ is out";
+"update.manual.text" = "It cannot be installed from the menu. You have %@.";
+"update.openRelease" = "Open Release";
+"update.ok" = "OK";
+"update.downloading" = "Downloading Keytide %@...";
+"update.installedRestart" = "Keytide %@ is installed, restart the app";
+"update.rejected" = "Update rejected: %@. Do not install this version by hand.";
+"update.notInstalled" = "Update not installed: %@. The release page is open.";
+"update.notInstalled.title" = "The update was not installed";
+"update.checking" = "Checking for updates...";
+"install.unsigned" = "self-update works only for a build signed with the certificate";
+"install.download" = "the update could not be downloaded";
+"install.image" = "the update image is damaged or has no Keytide.app";
+"install.signature" = "the update signature does not match the installed version";
+"install.copy" = "the update could not be copied next to the app";
+"install.replace" = "the app could not be replaced (no permission for its folder)";
+
+/* What's new */
+"whatsNew.title" = "What's New in Keytide %@";
+"whatsNew.ok" = "Got It";
+
+/* Shortcuts */
+"shortcut.help" = "Click and press a key combination. Escape cancels.";
+"shortcut.recording" = "Press keys...";
+"shortcut.alone" = "alone";
+
+/* Profile */
+"profile.restoredFields" = "Profile fields restored: %@";
+"profile.saveFailed" = "Could not save the profile: %@";
+"profile.error.unsupported" = "Damaged profile or unsupported version.";
+"profile.error.tooLarge" = "The profile is larger than 1 MB.";
+
+/* Settings: tabs and General */
+"settings.tab.general" = "General";
+"settings.tab.words" = "Words";
+"settings.tab.about" = "About";
+"settings.header" = "Layout under control";
+"settings.grantAccess" = "Grant Access";
+"settings.checkAccess" = "Check Access";
+"settings.login" = "Launch at login";
+"settings.autoUpdates" = "Check for updates automatically (once a day, GitHub)";
+"settings.spelling" = "Fix obvious typos";
+"settings.learning" = "Learn from repeated undos";
+"settings.learning.note" = "After two undos a word stops being corrected. No text history is kept.";
+"settings.hotkeys" = "Shortcuts";
+"settings.undo" = "Undo";
+"settings.protectWord" = "Protect word";
+"settings.hotkeys.note" = "Click a button and press a combination. A single modifier works too.\nGlobal shortcuts may override editor commands.";
+"settings.shortcutTaken" = "This shortcut is already in use.";
+"settings.undo.a11y" = "Shortcut to undo a correction";
+"settings.protect.a11y" = "Shortcut to protect a word";
+"settings.login.error" = "Launch at login: %@";
+"settings.login.approve" = "Allow Keytide in Login Items in System Settings.";
+"settings.login.unchanged" = "Launch at login did not change, macOS state: %@";
+
+/* Settings: Words */
+"words.protected" = "Protected words";
+"words.placeholder" = "One word, no spaces";
+"words.field.a11y" = "Word to protect";
+"words.add" = "Add";
+"words.remove" = "Remove";
+"words.learned" = "Learned: not corrected after two undos";
+"words.learned.list" = "Learned words";
+"words.forget" = "Forget";
+"words.forgetAll" = "Forget All";
+"words.exclusions" = "Excluded apps: bundle IDs, comma-separated";
+"words.exclusions.a11y" = "Excluded apps";
+"words.save" = "Save";
+"words.export" = "Export Profile";
+"words.import" = "Import Profile";
+"words.profile.note" = "The profile holds the word lists, settings and learning data. Everything stays on this Mac.";
+"words.invalidWord" = "Enter one word up to 64 characters.";
+"words.invalidApps" = "Check the app bundle IDs.";
+"words.exported" = "Profile exported.";
+"words.imported" = "Profile imported.";
+
+/* Settings: About */
+"about.tagline" = "Free local RU/EN layout switcher and typo corrector.";
+"about.version" = "Version %1$@ (build %2$@)";
+"about.signed" = "Signed with the Keytide certificate";
+"about.adhoc" = "Ad-hoc signature: no self-update";
+"about.signedOther" = "Signed with another certificate: not an official build";
+"about.system" = "macOS %1$@, %2$@";
+"about.links" = "Links";
+"about.site" = "Developer: firexrwt.com";
+"about.repo" = "Source code on GitHub";
+"about.releases" = "All releases";
+"about.license" = "MIT License";
+"about.checkUpdates" = "Check for Updates...";
+"about.help" = "Help and diagnostics";
+"about.diagnostics" = "Detailed diagnostics until Keytide quits (stages and lengths, never text)";
+"about.saveReport" = "Save Report...";
+"about.reportBug" = "Report a Bug";
+"about.report.note" = "The report has no typed text: versions, settings, counts, app IDs and timed diagnostic stages. GitHub issues are public: open the file and check it before attaching.";
+"about.reportSaved" = "Report saved.";
+"about.reportFailed" = "Could not save the report: %@";

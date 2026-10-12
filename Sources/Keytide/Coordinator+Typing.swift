@@ -26,7 +26,7 @@ extension Coordinator {
                                     spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }
             InputDiagnostics.record("keys analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
-            guard available else { onStatus?("Словари недоступны"); return }
+            guard available else { onStatus?(tr("status.dictionariesUnavailable")); return }
             guard generation == revision, active == nil else { stale += 1; return }
             guard let correction else { return }
             postTyped(resolved, correction, pid: pid, revision: revision, again: false)
@@ -44,9 +44,9 @@ extension Coordinator {
         switch typing.correct(typed, with: correction.replacement, source: target, previous: previous, pid: pid) {
         case .posted:
             corrections += 1; undoRecord = nil
-            onStatus?(correction.kind == .layout ? "Исправлена раскладка" : "Исправлена опечатка")
+            onStatus?(correction.kind == .layout ? tr("status.layoutFixed") : tr("status.typoFixed"))
         case .skipped: stale += 1
-        case .lost: halt("Отложенный ввод потерян при исправлении. Обработка остановлена.")
+        case .lost: halt(tr("status.halt.lostCorrection"))
         case .lagging:
             guard !again else { stale += 1; InputDiagnostics.record("keys refused reason=field still behind the keys"); return }
             later(0.04, revision: revision) { [weak self] in
@@ -82,10 +82,10 @@ extension Coordinator {
             undos += 1
             if undone.learnable { store.update { $0.recordUndo(undone.original) } }
             else { InputDiagnostics.record("keys undo not learned: word started after an edit") }
-            onStatus?("Исходное слово и раскладка восстановлены")
+            onStatus?(tr("status.restored"))
             return undone.original
         case .skipped, .lagging: return nil
-        case .lost: halt("Отложенный ввод потерян при отмене. Обработка остановлена."); return nil
+        case .lost: halt(tr("status.halt.lostUndo")); return nil
         }
     }
 }

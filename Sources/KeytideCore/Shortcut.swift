@@ -33,7 +33,8 @@ public struct Shortcut: Codable, Equatable {
         if let keyCode { return keyCode < 128 && !modifiers.intersection([.command, .control, .option]).isEmpty }
         return modifiers.rawValue.nonzeroBitCount == 1
     }
-    public var label: String { modifiers.label + (keyCode == nil ? " отдельно" : keyLabel) }
+    // A lone modifier shows only its symbol; the app adds the localized "alone".
+    public var label: String { modifiers.label + (keyCode == nil ? "" : keyLabel) }
     public func overlaps(_ other: Shortcut) -> Bool { keyCode == other.keyCode && modifiers == other.modifiers }
 }
 

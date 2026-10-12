@@ -24,7 +24,7 @@ final class ProfileStore {
                 if !decoded.1.isEmpty {
                     profile.enabled = false
                     originalDamaged = data
-                    warning = "В профиле восстановлены поля: " + decoded.1.joined(separator: ", ")
+                    warning = tr("profile.restoredFields", decoded.1.joined(separator: ", "))
                 }
             } catch {
                 profile.enabled = false
@@ -65,7 +65,7 @@ final class ProfileStore {
             return true
         } catch {
             saveError = error
-            onError?("Не удалось сохранить профиль: " + error.localizedDescription)
+            onError?(tr("profile.saveFailed", error.localizedDescription))
             return false
         }
     }

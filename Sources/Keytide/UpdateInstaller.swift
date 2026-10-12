@@ -6,13 +6,19 @@ import KeytideCore
 // Downloads, verifies and swaps in a release. Trust rests on the signing key: the image and the app inside it must
 // satisfy the running app's designated requirement. Every failure before the swap leaves the installed app untouched.
 final class UpdateInstaller: NSObject, URLSessionTaskDelegate {
-    enum Failure: String, Error {
-        case unsigned = "автообновление работает только у сборки, подписанной сертификатом"
-        case download = "не удалось скачать обновление"
-        case image = "образ обновления повреждён или в нём нет Keytide.app"
-        case signature = "подпись обновления не совпадает с установленной версией"
-        case copy = "не удалось скопировать обновление рядом с приложением"
-        case replace = "не удалось заменить приложение (нет прав на его папку)"
+    enum Failure: Error {
+        case unsigned, download, image, signature, copy, replace
+        // Literal keys, so LocalizationTests can check each one.
+        var message: String {
+            switch self {
+            case .unsigned: return tr("install.unsigned")
+            case .download: return tr("install.download")
+            case .image: return tr("install.image")
+            case .signature: return tr("install.signature")
+            case .copy: return tr("install.copy")
+            case .replace: return tr("install.replace")
+            }
+        }
     }
     static let log = Logger(subsystem: "dev.firexrwt.keytide", category: "update")
     private lazy var session: URLSession = {
@@ -96,11 +102,23 @@ final class UpdateInstaller: NSObject, URLSessionTaskDelegate {
 
     private static func fail(_ failure: Failure, _ step: String) -> Failure {
         log.error("update failed at \(step, privacy: .public)")
+        InputDiagnostics.note("update failed at \(step)")
         return failure
     }
 
     // The running app's designated requirement. An ad-hoc build's requirement is its own hash, which nothing newer
     // can satisfy, so such a build refuses up front instead of downloading for nothing.
+    enum Signature: String { case keytide = "Keytide certificate", other = "another certificate", adhoc = "ad-hoc" }
+    // The release certificate (SHA-1 of the leaf), pinned like REQUIREMENT in release.yml.
+    static let releaseLeaf = "f17aa23f772d72310797b7e3aabd4db522de9923"
+
+    static var signature: Signature {
+        var text: CFString?
+        guard let requirement = ownRequirement(), SecRequirementCopyString(requirement, [], &text) == errSecSuccess
+        else { return .adhoc }
+        return (text as String?)?.lowercased().contains(releaseLeaf) == true ? .keytide : .other
+    }
+
     static func ownRequirement() -> SecRequirement? {
         var code: SecCode?, staticCode: SecStaticCode?, requirement: SecRequirement?, text: CFString?
         guard SecCodeCopySelf([], &code) == errSecSuccess, let code,

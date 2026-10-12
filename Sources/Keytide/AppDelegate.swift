@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let updater = Updater()
     private var settings: SettingsWindow?
     private var item: NSStatusItem!
-    private var status = "Запуск..."
+    private var status = tr("app.starting")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UpdateInstaller.removeLeftovers()
@@ -17,8 +17,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu(); menu.delegate = self; item.menu = menu
         engine.onStatus = { [weak self] text in self?.report(text) }
         updater.onStatus = { [weak self] text in self?.report(text) }
-        store.onChange = { [weak self] in self?.engine.apply(); self?.settings?.refresh() }
-        store.onError = { [weak self] message in self?.status = message; self?.settings?.show(message) }
+        // Settings are rebuilt only while shown; open() refreshes them anyway.
+        store.onChange = { [weak self] in
+            self?.engine.apply()
+            if self?.settings?.isVisible == true { self?.settings?.refresh() }
+        }
+        // A profile that could not be saved must not look saved, whatever tab or app is in front.
+        store.onError = { [weak self] message in self?.status = message; UpdateAlert.failed(message, title: message) }
         engine.apply()
         if let warning = store.warning { status = warning }
         if !AXIsProcessTrusted() { openSettings() }
@@ -36,26 +41,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let info = NSMenuItem(title: status, action: nil, keyEquivalent: ""); info.isEnabled = false; menu.addItem(info)
         switch updater.latest {
         case .current: break
-        case .update(let release): add("Обновить до \(release.version)", #selector(install), to: menu)
-        case .manual(let version, _): add("Открыть релиз \(version) на GitHub", #selector(openRelease), to: menu)
+        case .update(let release): add(tr("menu.update", release.version.description), #selector(install), to: menu)
+        case .manual(let version, _): add(tr("menu.openRelease", version.description), #selector(openRelease), to: menu)
         }
         menu.addItem(.separator())
-        add(store.profile.enabled ? "Приостановить" : "Включить", #selector(pause), to: menu)
-        add("Настройки...", #selector(openSettings), to: menu)
-        add("Проверить доступ", #selector(retry), to: menu)
-        add("Проверить обновления", #selector(checkUpdates), to: menu)
-        if WhatsNew.available { add("Что нового", #selector(whatsNew), to: menu) }
+        add(store.profile.enabled ? tr("menu.pause") : tr("menu.resume"), #selector(pause), to: menu)
+        add(tr("menu.settings"), #selector(openSettings), to: menu)
+        add(tr("menu.checkAccess"), #selector(retry), to: menu)
+        add(tr("menu.checkUpdates"), #selector(checkUpdates), to: menu)
+        if WhatsNew.available { add(tr("menu.whatsNew"), #selector(whatsNew), to: menu) }
+        add(tr("menu.about"), #selector(about), to: menu)
         menu.addItem(.separator())
-        add("Выйти из Keytide", #selector(quit), to: menu)
+        add(tr("menu.quit"), #selector(quit), to: menu)
     }
     @objc private func pause() { store.update { $0.enabled.toggle() } }
     @objc private func install() { updater.install() }
     @objc private func openRelease() { if case .manual(_, let page) = updater.latest { NSWorkspace.shared.open(page) } }
     @objc private func checkUpdates() { updater.check(manual: true) }
     @objc private func whatsNew() { WhatsNew.show() }
-    @objc private func openSettings() {
+    @objc private func openSettings() { showSettings(nil) }
+    @objc private func about() { showSettings(.about) }
+    private func showSettings(_ tab: SettingsWindow.Tab?) {
         if settings == nil { settings = SettingsWindow(store: store, engine: engine, updater: updater) }
-        settings?.show(status); settings?.open()
+        settings?.show(status); settings?.open(tab)
     }
     @objc private func retry() { engine.retry() }
     @objc private func quit() { NSApp.terminate(nil) }

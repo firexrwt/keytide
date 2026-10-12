@@ -34,7 +34,9 @@ final class EventTap {
     private var gateSerial: UInt64 = 0
     private var word = TypedWord()
     private var inputSerial: UInt64 = 0
-    private(set) var events = 0
+    private var events = 0
+    // Written under the lock on the tap thread.
+    var eventCount: Int { lock.lock(); defer { lock.unlock() }; return events }
 
     func configure(_ bindings: [Shortcut]) {
         lock.lock(); self.bindings = bindings; lock.unlock()
@@ -147,7 +149,7 @@ final class EventTap {
                 guard let self else { return }
                 lock.lock(); let callback = cancelGate; lock.unlock()
                 callback?(); stop(replay: false)
-                onFailure?("macOS остановила обработку клавиатуры. Нажмите «Проверить доступ».")
+                onFailure?(tr("status.tapStopped"))
             }
             return false
         }

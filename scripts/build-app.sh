@@ -9,6 +9,11 @@ mkdir -p "$app/Contents/Resources"
 cp "$bin/Keytide" "$app/Contents/MacOS/Keytide"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+# Interface strings: the language follows macOS (Info.plist lists en and ru).
+for language in en ru; do
+    rm -rf "$app/Contents/Resources/$language.lproj"
+    ditto "Resources/$language.lproj" "$app/Contents/Resources/$language.lproj"
+done
 ditto "$bin/Keytide_KeytideCore.bundle" "$app/Contents/Resources/Keytide_KeytideCore.bundle"
 # One stable certificate for every build: the Accessibility grant and self-updates are tied to it, not to a hash.
 source scripts/identity.sh

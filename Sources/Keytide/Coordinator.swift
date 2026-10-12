@@ -57,13 +57,13 @@ final class Coordinator {
         invalidate()
         let excluded = Set(store.profile.excludedApps), enabled = store.profile.enabled
         typing.releaseAccessibility { !enabled || excluded.contains($0) }
-        guard store.profile.enabled else { tap.stop(); onStatus?("Приостановлено"); return }
+        guard store.profile.enabled else { tap.stop(); onStatus?(tr("status.paused")); return }
         guard AXIsProcessTrusted() else {
-            waitingForAccess = true; tap.stop(); onStatus?("Нужен «Универсальный доступ»"); return
+            waitingForAccess = true; tap.stop(); onStatus?(tr("status.needsAccess")); return
         }
-        guard tap.start() else { onStatus?("macOS не разрешила обработку клавиатуры. Проверьте доступ."); return }
+        guard tap.start() else { onStatus?(tr("status.tapRefused")); return }
         InputDiagnostics.record("tap started map=\(sources.map != nil)")
-        onStatus?(sources.map == nil ? "Добавьте русскую и английскую раскладки в macOS" : "Работает локально")
+        onStatus?(sources.map == nil ? tr("status.addLayouts") : tr("status.running"))
     }
 
     func stop() { tap.stop(); typing.releaseAccessibility { _ in true }; store.flush() }
@@ -100,7 +100,8 @@ final class Coordinator {
             return false
         }
         guard !repeated, [UInt16(49), 36, 76].contains(code), active == nil, !spell.busy else { return false }
-        InputDiagnostics.record("boundary generation=\(generation)")
+        // No counter: differences between boundaries would show how many keys were typed, also in excluded apps.
+        InputDiagnostics.record("boundary")
         let revision = generation
         // One event-triggered handoff lets the recipient insert the boundary. Never an idle timer.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.008) { [weak self] in
@@ -133,12 +134,12 @@ final class Coordinator {
     }
 
     private func correctField(_ snapshot: TextSnapshot, revision: UInt64) {
-        InputDiagnostics.record("captured word length=\(snapshot.word.range.length) caret=\(snapshot.selection.location)")
+        InputDiagnostics.record("captured word length=\(snapshot.word.range.length)")
         _ = spell.analyze(snapshot.word.word, map: sources.map, protected: store.immune,
                           spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }
             InputDiagnostics.record("analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
-            guard available else { onStatus?("Словари недоступны"); return }
+            guard available else { onStatus?(tr("status.dictionariesUnavailable")); return }
             guard generation == revision, active == nil else { stale += 1; return }
             guard let correction, let previous = sources.currentID,
                   sources.entries.contains(where: { $0.id == previous }),
@@ -155,7 +156,7 @@ final class Coordinator {
                 undoRecord = UndoRecord(snapshot: current, replacement: replacement,
                                         previousSource: previous, targetSource: target)
                 typing.forget()
-                onStatus?(correction.kind == .layout ? "Исправлена раскладка" : "Исправлена опечатка")
+                onStatus?(correction.kind == .layout ? tr("status.layoutFixed") : tr("status.typoFixed"))
             }
         }
     }
@@ -165,7 +166,7 @@ final class Coordinator {
         let undo = store.profile.undo, protectBinding = store.profile.protect
         if undo.keyCode == code && undo.modifiers == flags { return undoLast() }
         guard protectBinding.keyCode == code && protectBinding.modifiers == flags else { return false }
-        guard store.profile.protectedWords.count < 10_000 else { onStatus?("Словарь заполнен"); return false }
+        guard store.profile.protectedWords.count < 10_000 else { onStatus?(tr("status.dictionaryFull")); return false }
         switch text.capture(boundary: false, exclusions: store.profile.excludedApps) {
         case .field(let snapshot):
             if let record = undoRecord, CFEqual(record.snapshot.element, snapshot.element),
@@ -193,7 +194,7 @@ final class Coordinator {
             let key = Words.normalized(word)
             if !profile.protectedWords.contains(key) { profile.protectedWords.append(key); profile.protectedWords.sort() }
         }
-        onStatus?("Слово защищено от исправлений")
+        onStatus?(tr("status.protected"))
     }
 
     @discardableResult func undoLast(after: (() -> Void)? = nil) -> Bool {
@@ -210,7 +211,7 @@ final class Coordinator {
             undoRecord = nil
             undos += 1
             store.update { $0.recordUndo(record.snapshot.word.word) }
-            onStatus?("Исходное слово и раскладка восстановлены")
+            onStatus?(tr("status.restored"))
             after?()
         }
         return true
@@ -303,9 +304,9 @@ final class Coordinator {
             InputDiagnostics.record("replace outcome=\(outcome) elapsed_ms=\(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))")
             switch outcome {
             case .confirmed: break
-            case .restored: onStatus?("Исправление пропущено, исходный ввод сохранен")
+            case .restored: onStatus?(tr("status.skipped"))
             case .uncertain:
-                halt("Исход исправления не подтвержден. Обработка остановлена, отложенный ввод отменен.")
+                halt(tr("status.halt.uncertain"))
             }
             completion(outcome == .confirmed)
         })

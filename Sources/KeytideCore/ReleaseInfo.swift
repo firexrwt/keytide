@@ -16,6 +16,15 @@ public struct ReleaseInfo: Equatable {
     public let dmg: URL
     public let page: URL
 
+    // The newest published version, whatever this build is: shown by a manual check ("on GitHub: Y").
+    public static func latest(_ data: Data) -> Version? {
+        guard data.count <= 1_048_576,
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              object["draft"] as? Bool != true, object["prerelease"] as? Bool != true,
+              let tag = object["tag_name"] as? String, tag.first == "v" else { return nil }
+        return Version(String(tag.dropFirst()))
+    }
+
     public static func check(_ data: Data, current: Version, repository: String = "firexrwt/keytide") -> ReleaseCheck {
         guard data.count <= 1_048_576,
               let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],

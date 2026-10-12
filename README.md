@@ -12,7 +12,9 @@ Type `ghbdtn ` and get `привет `, type `руддщ ` and get `hello `: aft
 - Protected words also work as layout targets: protect `локи` and `kjrb` becomes `локи`.
 - Optional learning: two undos of the same word stop correcting it. Learned words can be reviewed and forgotten in Settings.
 - Excluded apps (terminals and code editors by default), pause, launch at login, profile export and import.
-- Updates itself on one click from the menu and keeps the Accessibility permission (from 0.1.1). After an update, Settings shows what changed in plain words once (also under "Что нового" in the menu).
+- Updates itself on one click from the menu and keeps the Accessibility permission (from 0.1.1). Check for Updates answers in a window: up to date (with the version on GitHub) or a newer version with an Update button. After an update, Settings shows what changed in plain words once (also under What's New in the menu).
+- English and Russian interface, following the macOS language (a different one can be set for Keytide in System Settings > General > Language & Region > Applications).
+- About tab (also About Keytide in the menu): version, links, a diagnostics switch, Save Report and Report a Bug, which opens the GitHub issue form with the version and macOS filled in.
 - Bundled RU/EN dictionary of about 1.5 million word forms in a 1.4 MB memory-mapped index; the macOS spell checker handles everything else.
 
 ## How it works
@@ -24,7 +26,7 @@ Keytide needs the macOS Accessibility permission to see key presses and edit tex
 - Where such a field can still be read (Raycast, most native apps, Electron apps like Claude desktop), Keytide reads the word before the caret at the space, so a word is corrected whole wherever it stands, even when you finish an existing word, and fragments are never learned. For Electron apps it turns on their accessibility tree (`AXManualAccessibility`) at the first key you type there, never in password managers, and turns it off again when Keytide quits or the app is excluded; this costs that app about 20 MB. Where a field cannot be read at all, the typed word is still corrected, but undoing a word that started after a click, an arrow key or a Backspace past its start teaches Keytide nothing, since it may be part of a longer word.
 - Nothing is corrected under Secure Input, in password fields, in excluded apps, when the focus is not a text field, when text is selected, or when anything was pressed after the space.
 
-No text history, clipboard or telemetry. Diagnostics are opt-in and log stages and lengths, never words.
+No text history, clipboard or telemetry. Diagnostics are opt-in (About > Detailed diagnostics) and log stages, lengths and app IDs, never words. The report from Save Report holds versions, settings, counts and those diagnostic lines; word lists are counted, not listed. Nothing is sent anywhere: you attach the file yourself.
 
 The only network access is updates: once a day Keytide asks api.github.com for the latest release (turn it off in Settings; "Check for updates" in the menu works anyway), and it downloads a release from github.com (served from GitHub's storage on *.githubusercontent.com) only when you click "Update". An update is installed only if both the dmg and the app inside it are signed with the same certificate as the running app. If Keytide rejects an update for its signature, do not install that version by hand.
 
