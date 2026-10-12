@@ -75,8 +75,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           DMG: ${{ steps.pack.outputs.dmg }}
+        # The text is this version's CHANGELOG.md section (ReleaseNotesTests requires it) plus the install steps.
         run: |
-          gh release create "$TAG" "$DMG" --draft --title "Keytide $TAG" --notes "Install: open the dmg and drag Keytide to Applications. The app is not notarized: if macOS refuses to open it, click Open Anyway in System Settings > Privacy & Security, then allow it in System Settings > Privacy & Security > Accessibility. Keytide 0.1.1 and later update themselves from the menu and keep that permission. Coming from 0.1.0: remove the old Keytide entry there with - and add the app again, once."
+          notes="$RUNNER_TEMP/notes.md"
+          awk -v head="## ${TAG#v} - " 'index($0, head) == 1 { found = 1; next } found && /^## / { exit } found' CHANGELOG.md > "$notes"
+          grep -q '^- ' "$notes" || { echo "CHANGELOG.md has no section for ${TAG#v}" >&2; exit 1; }
+          printf '\n### Install\n\n%s\n' "Open the dmg and drag Keytide to Applications. The app is not notarized: if macOS refuses to open it, click Open Anyway in System Settings > Privacy & Security, then allow it in System Settings > Privacy & Security > Accessibility. Keytide 0.1.1 and later update themselves from the menu and keep that permission. Coming from 0.1.0: remove the old Keytide entry there with - and add the app again, once." >> "$notes"
+          gh release create "$TAG" "$DMG" --draft --title "Keytide $TAG" --notes-file "$notes"
 
       - name: Remove signing keychain
         if: always()

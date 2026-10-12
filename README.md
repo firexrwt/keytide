@@ -62,7 +62,7 @@ The dmg window is generated too. `swift scripts/make-dmg-background.swift build/
 
 `build-app.sh` and `make-dmg.sh` sign with the identity named `Keytide Code Signing` when the keychain has its private key, otherwise ad-hoc: an ad-hoc build loses the Accessibility permission on every rebuild and cannot update itself or be offered as an update.
 
-Releases are built by GitHub Actions: pushing a tag `v<version>` that matches `CFBundleShortVersionString` runs the release tests, signs the app and the dmg, checks both against the pinned certificate and drafts a release. The job runs in the `release` environment, which holds the `KEYTIDE_CERT_P12` and `KEYTIDE_CERT_PASSWORD` secrets and waits for the owner's approval.
+Releases are built by GitHub Actions: pushing a tag `v<version>` that matches `CFBundleShortVersionString` runs the release tests, signs the app and the dmg, checks both against the pinned certificate and drafts a release whose text is that version's section of [CHANGELOG.md](CHANGELOG.md) (the tests fail without it). The job runs in the `release` environment, which holds the `KEYTIDE_CERT_P12` and `KEYTIDE_CERT_PASSWORD` secrets and waits for the owner's approval.
 
 ## Signing certificate
 
