@@ -37,6 +37,8 @@ final class EventTap {
     private var events = 0
     // Written under the lock on the tap thread.
     var eventCount: Int { lock.lock(); defer { lock.unlock() }; return events }
+    // Main thread, like start and stop.
+    var isRunning: Bool { port != nil }
 
     func configure(_ bindings: [Shortcut]) {
         lock.lock(); self.bindings = bindings; lock.unlock()
@@ -59,8 +61,10 @@ final class EventTap {
     func start() -> Bool {
         guard port == nil else { return true }
         relocateWord()
+        // No scrolling: a scroll changes no text, and every scroll event would pass through this tap (measured
+        // 0.23 ms of CPU each). A lone modifier asks once, on release, whether a scroll happened while it was held.
         let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged, .leftMouseDown, .rightMouseDown,
-                                  .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp, .scrollWheel]
+                                  .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp]
         let mask = types.reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
         port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
             eventsOfInterest: mask, callback: { _, type, event, context in
@@ -179,8 +183,11 @@ final class EventTap {
         }
         lock.unlock()
         if type == .flagsChanged {
+            let now = ProcessInfo.processInfo.systemUptime
             lock.lock()
-            let released = tapState.changed(flags, previous: previous)
+            let released = tapState.changed(flags, previous: previous, now: now) {
+                now - CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .scrollWheel)
+            }
             previous = flags
             lock.unlock()
             if let released { DispatchQueue.main.async { [weak self] in _ = self?.onModifier?(released) } }
@@ -227,7 +234,7 @@ final class EventTap {
                 return Typed(retype: Retype(word: "", suffix: ""), serial: serial, edited: true)
             }
             return Typed(retype: retype, serial: serial, edited: word.finishedAfterEdit)
-        case .keyUp, .flagsChanged, .scrollWheel: return nil
+        case .keyUp, .flagsChanged: return nil
         default:
             // A click may move the caret into existing text: refuse a pending correction, and what follows is an edit.
             inputSerial &+= 1; word.relocate(); return nil

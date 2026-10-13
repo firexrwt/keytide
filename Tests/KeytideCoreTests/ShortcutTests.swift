@@ -46,4 +46,35 @@ final class ShortcutTests: XCTestCase {
         XCTAssertNil(tap.changed([.option, .shift], previous: .option))
         XCTAssertNil(tap.changed([], previous: [.option, .shift]))
     }
+
+    // Scrolling is not tapped: Option + scroll must not read as a lone Option (the undo).
+    func testModifierTapDisarmsWhenTheUserScrolledWhileHoldingIt() {
+        var tap = ModifierTap()
+        XCTAssertNil(tap.changed(.option, previous: [], now: 10))
+        XCTAssertNil(tap.changed([], previous: .option, now: 10.3) { 10.1 })
+
+        XCTAssertNil(tap.changed(.option, previous: [], now: 20))
+        XCTAssertEqual(tap.changed([], previous: .option, now: 20.2) { 19.5 }, .option, "a scroll before the press")
+    }
+
+    func testTheUndoWindowClosesAfterTenSeconds() {
+        XCTAssertTrue(UndoWindow.isOpen(since: 100, now: 100))
+        XCTAssertTrue(UndoWindow.isOpen(since: 100, now: 110))
+        XCTAssertFalse(UndoWindow.isOpen(since: 100, now: 110.01))
+        XCTAssertFalse(UndoWindow.isOpen(since: 100, now: 99), "a clock that went back opens nothing")
+    }
+
+    func testKeyRoles() {
+        XCTAssertEqual(KeyRole.of(49, flags: [], repeated: false), .boundary, "space")
+        XCTAssertEqual(KeyRole.of(36, flags: [], repeated: false), .boundary, "Return")
+        XCTAssertEqual(KeyRole.of(76, flags: [], repeated: false), .boundary, "keypad Enter")
+        XCTAssertEqual(KeyRole.of(49, flags: .shift, repeated: false), .boundary, "Shift+space still ends a word")
+        XCTAssertEqual(KeyRole.of(49, flags: [], repeated: true), .typing, "a held space corrects nothing")
+        XCTAssertEqual(KeyRole.of(49, flags: .option, repeated: false), .edit, "Option+space is a chord")
+        XCTAssertEqual(KeyRole.of(0, flags: .command, repeated: false), .edit, "Cmd+A")
+        for code: UInt16 in [48, 51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126] {
+            XCTAssertEqual(KeyRole.of(code, flags: [], repeated: true), .edit, "key \(code) moves or edits")
+        }
+        XCTAssertEqual(KeyRole.of(5, flags: .shift, repeated: false), .typing, "Shift+G")
+    }
 }

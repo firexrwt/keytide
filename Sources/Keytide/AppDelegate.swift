@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.button?.setAccessibilityLabel("Keytide")
         let menu = NSMenu(); menu.delegate = self; item.menu = menu
         engine.onStatus = { [weak self] text in self?.report(text) }
+        engine.onLayouts = { [weak self] in if self?.settings?.isVisible == true { self?.settings?.refresh() } }
         updater.onStatus = { [weak self] text in self?.report(text) }
         // Settings are rebuilt only while shown; open() refreshes them anyway.
         store.onChange = { [weak self] in
@@ -32,8 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if InputDiagnostics.enabled { InputDiagnostics.setEnabled(true) }
     }
 
+    // A dimmed icon says Keytide is not correcting (paused, stopped after a failure, no access, a layout missing)
+    // without opening the menu.
     private func report(_ text: String) {
         status = text; item.button?.toolTip = "Keytide: " + text; settings?.show(text)
+        if let button = item.button, button.appearsDisabled == engine.working { button.appearsDisabled = !engine.working }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) { engine.becameActive() }

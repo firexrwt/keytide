@@ -2,6 +2,19 @@
 
 All notable changes to Keytide, newest first. Each version's section is also the text of its GitHub release.
 
+## 0.1.5 - 2026-10-13
+
+### Changed
+
+- A single Option press undoes a correction only within 10 seconds of it, time asleep included. Control+D still undoes and protects the word at any time, as before.
+- The menu bar icon is dimmed while Keytide is not correcting: paused, without the Accessibility permission, stopped after a failure or without a layout it needs.
+- Scroll events no longer pass through Keytide's event tap; each one cost about 0.23 ms of CPU. Option held while scrolling still does not count as a lone Option, and a scroll after a correction still voids its Option undo.
+- The keystroke path's word choice, the role of each key and the undo window are decided in KeytideCore and covered by tests.
+
+### Fixed
+
+- Layouts added or removed in System Settings are picked up without restarting Keytide.
+
 ## 0.1.4 - 2026-10-12
 
 ### Changed

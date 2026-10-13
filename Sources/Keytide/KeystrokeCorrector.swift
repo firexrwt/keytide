@@ -41,38 +41,32 @@ final class KeystrokeCorrector {
     // A `loose` field (a plain AXTextField reports no subrole) gives its whole word too: secure fields are told apart
     // by their subrole and Secure Input, and the burst is refused unless the same element confirms the word twice.
 
-    // Which word the space ended, wherever it stands in the field. A word typed right after a space is whole as typed
-    // (its tail is checked before posting). After an edit (click, caret key, chord, app switch, Backspace past its
-    // start) the field decides: the typed run or the whole word it ends; a field showing another word (autocorrect)
-    // is left alone. A field still without the space, or an Electron tree just asked for, gets one more read (`wait`).
-    // A field that cannot be read gets the typed run as typed, and undoing that teaches nothing.
+    // Which word the space ended, wherever it stands in the field (`WordChoice` decides, tested in Core). A word typed
+    // right after a space is whole as typed (its tail is checked before posting). After an edit (click, caret key,
+    // chord, app switch, Backspace past its start) the field names the whole word when it answers; a field that cannot
+    // be read gets the typed run, and undoing that teaches nothing.
     func resolve(_ typed: Typed, app: NSRunningApplication, last: Bool) -> Resolution {
-        guard typed.edited || typed.retype.word.isEmpty else { return .word(typed) }
+        guard WordChoice.needsField(typed.retype, edited: typed.edited) else { return .word(typed) }
+        let answer: WordChoice.Answer, field: AXUIElement?
         switch text.typedInField(typed.retype, pid: app.processIdentifier) {
-        case .read(.same, let field, _):
-            InputDiagnostics.record("keys field word same")
-            return .word(Typed(retype: typed.retype, serial: typed.serial, field: field))
-        case .read(.whole(let retype), let field, let loose):
-            InputDiagnostics.record("keys field word whole loose=\(loose)")
-            return .word(Typed(retype: retype, serial: typed.serial, field: field))
-        case .read(.changed, _, _):
-            return refuseResolution("field shows another word")
-        case .read(.pending, _, _):
-            if !last { InputDiagnostics.record("keys field pending"); return .wait(0.04) }
-            InputDiagnostics.record("keys field still without the space")
+        case .read(let shown, let element, let loose):
+            InputDiagnostics.record("keys field read=\(shown.label) loose=\(loose)")
+            answer = .read(shown); field = element
         case .unanswered(let reason):
             InputDiagnostics.record("keys field unanswered reason=\(reason)")
-            if electron.request(for: app, revive: true) && !last { return .wait(0.15) }
+            answer = .unanswered; field = nil
         case .refused(let reason):
-            return refuseResolution(reason)
+            answer = .refused(reason); field = nil
         }
-        guard !typed.retype.word.isEmpty else { return refuseResolution("no typed word") }
-        return .word(typed)
-    }
-
-    private func refuseResolution(_ reason: String) -> Resolution {
-        InputDiagnostics.record("keys refused reason=\(reason)")
-        return .skip
+        let requested = answer == .unanswered && electron.request(for: app, revive: true)
+        let choice = WordChoice.choose(answer, typed: typed.retype, last: last, treeRequested: requested)
+        InputDiagnostics.record("keys word \(choice.label)")
+        switch choice {
+        case .typed: return .word(typed)
+        case .field(let word): return .word(Typed(retype: word, serial: typed.serial, field: field))
+        case .again(let delay): return .wait(delay)
+        case .skip(let reason): InputDiagnostics.record("keys refused reason=\(reason)"); return .skip
+        }
     }
 
     func correct(_ typed: Typed, with replacement: String, source: String, previous: String, pid: pid_t) -> Outcome {

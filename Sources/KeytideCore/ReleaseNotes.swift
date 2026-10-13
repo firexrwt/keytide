@@ -41,6 +41,20 @@ public enum ReleaseNotes {
                 "Detailed diagnostics turn themselves off after 30 minutes.",
             ],
         ],
+        "0.1.5": [
+            "ru": [
+                "Значок в строке меню тускнеет, когда Keytide не исправляет: на паузе, без доступа, после сбоя или без нужной раскладки.",
+                "Добавили или убрали раскладку в настройках системы - Keytide заметит это сам, без перезапуска.",
+                "Option отменяет исправление только в первые 10 секунд после него: случайное нажатие позже ничего не вернёт.",
+                "Прокрутка больше не проходит через Keytide.",
+            ],
+            "en": [
+                "The menu bar icon dims while Keytide is not correcting: paused, without access, after a failure or without a layout it needs.",
+                "Add or remove a layout in System Settings and Keytide notices it by itself, no restart needed.",
+                "Option undoes a correction only within 10 seconds of it: a stray press later brings nothing back.",
+                "Scrolling no longer passes through Keytide.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

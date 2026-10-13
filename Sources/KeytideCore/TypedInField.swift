@@ -30,4 +30,56 @@ public enum TypedInField: Equatable {
         guard !token.isEmpty, token.count <= Words.maximumLength, token.hasSuffix(run) else { return .changed }
         return token == run ? .same : .whole(Retype(typed: token))
     }
+
+    // For diagnostics: the case only, never the word.
+    public var label: String {
+        switch self {
+        case .same: return "same"
+        case .whole: return "whole"
+        case .changed: return "changed"
+        case .pending: return "pending"
+        }
+    }
+}
+
+// Which word the keystroke path corrects at a space. Position never decides (owner rule): a word typed after an edit
+// is corrected even where the field cannot be read; the field only names the whole word, asks for one more look, or
+// vetoes when it shows something else.
+public enum WordChoice: Equatable {
+    // The run as typed.
+    case typed
+    // The field's whole word: the same field must confirm it again before posting.
+    case field(Retype)
+    // Read the field once more after this delay.
+    case again(TimeInterval)
+    // Nothing is corrected; the reason is a literal, for diagnostics.
+    case skip(String)
+
+    public enum Answer: Equatable { case read(TypedInField), unanswered, refused(String) }
+
+    // A word typed right after a space is whole as typed: the field is not read at all.
+    public static func needsField(_ typed: Retype, edited: Bool) -> Bool { edited || typed.word.isEmpty }
+
+    // `last`: no more looks allowed. `treeRequested`: an Electron app was just asked for its accessibility tree.
+    public static func choose(_ answer: Answer, typed: Retype, last: Bool, treeRequested: Bool) -> WordChoice {
+        switch answer {
+        case .read(.same): return .field(typed)
+        case .read(.whole(let word)): return .field(word)
+        case .read(.changed): return .skip("field shows another word")
+        case .read(.pending) where !last: return .again(0.04)
+        case .unanswered where treeRequested && !last: return .again(0.15)
+        case .refused(let reason): return .skip(reason)
+        case .read(.pending), .unanswered: break
+        }
+        return typed.word.isEmpty ? .skip("no typed word") : .typed
+    }
+
+    public var label: String {
+        switch self {
+        case .typed: return "typed"
+        case .field: return "field"
+        case .again: return "again"
+        case .skip: return "skip"
+        }
+    }
 }

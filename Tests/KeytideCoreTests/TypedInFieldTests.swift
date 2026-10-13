@@ -57,4 +57,38 @@ final class TypedInFieldTests: XCTestCase {
         XCTAssertEqual(TypedInField.resolve(prefix: long + " ", fromFieldStart: true, typed: Retype(word: "a", suffix: "")),
                        .changed)
     }
+
+    func testOnlyAWordAfterAnEditOrAnUnknownWordReadsTheField() {
+        XCTAssertFalse(WordChoice.needsField(typed, edited: false))
+        XCTAssertTrue(WordChoice.needsField(typed, edited: true))
+        XCTAssertTrue(WordChoice.needsField(Retype(word: "", suffix: ""), edited: false))
+    }
+
+    // Owner rule: position never decides. A word started after a click is corrected even where the field is silent.
+    func testAWordAfterAnEditIsCorrectedEvenWhenTheFieldCannotBeRead() {
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: false), .typed)
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: true, treeRequested: true), .typed)
+        XCTAssertEqual(WordChoice.choose(.read(.pending), typed: typed, last: true, treeRequested: false), .typed)
+    }
+
+    func testTheFieldNamesTheWholeWordOrVetoes() {
+        let whole = Retype(word: "pdtplysq", suffix: "")
+        XCTAssertEqual(WordChoice.choose(.read(.same), typed: typed, last: false, treeRequested: false), .field(typed))
+        XCTAssertEqual(WordChoice.choose(.read(.whole(whole)), typed: typed, last: false, treeRequested: false), .field(whole))
+        XCTAssertEqual(WordChoice.choose(.read(.changed), typed: typed, last: false, treeRequested: false),
+                       .skip("field shows another word"))
+        XCTAssertEqual(WordChoice.choose(.refused("secure field"), typed: typed, last: false, treeRequested: false),
+                       .skip("secure field"))
+    }
+
+    func testASlowFieldGetsExactlyOneMoreLook() {
+        XCTAssertEqual(WordChoice.choose(.read(.pending), typed: typed, last: false, treeRequested: false), .again(0.04))
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: true), .again(0.15))
+    }
+
+    func testAWordTheKeysCouldNotShowNeedsTheField() {
+        let empty = Retype(word: "", suffix: "")
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: empty, last: true, treeRequested: false), .skip("no typed word"))
+        XCTAssertEqual(WordChoice.choose(.read(.whole(typed)), typed: empty, last: false, treeRequested: false), .field(typed))
+    }
 }

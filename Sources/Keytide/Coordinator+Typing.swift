@@ -43,7 +43,7 @@ extension Coordinator {
         }
         switch typing.correct(typed, with: correction.replacement, source: target, previous: previous, pid: pid) {
         case .posted:
-            corrections += 1; undoRecord = nil
+            corrections += 1; undoRecord = nil; correctedAt = UndoWindow.clock
             onStatus?(correction.kind == .layout ? tr("status.layoutFixed") : tr("status.typoFixed"))
         case .skipped: stale += 1
         case .lost: halt(tr("status.halt.lostCorrection"))

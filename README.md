@@ -8,7 +8,7 @@ Type `ghbdtn ` and get `привет `, type `руддщ ` and get `hello `: aft
 
 - Wrong-layout words corrected after a space, both directions, from two letters (`lf` -> `да`). Case is kept. English contractions typed in the Russian layout are fixed too (`дуеэы` -> `let's`).
 - Obvious typos corrected from three letters, only when the fix is one edit away.
-- Single Option undoes the last correction and restores the previous layout. Control+D protects a word from corrections. Both shortcuts are configurable.
+- Single Option, within 10 seconds of a correction, undoes it and restores the previous layout. The menu bar icon dims while Keytide is not correcting. Control+D protects a word from corrections. Both shortcuts are configurable.
 - Protected words also work as layout targets: protect `локи` and `kjrb` becomes `локи`.
 - Optional learning: two undos of the same word stop correcting it. Learned words can be reviewed and forgotten in Settings.
 - Excluded apps (terminals and code editors by default), pause, launch at login, profile export and import.

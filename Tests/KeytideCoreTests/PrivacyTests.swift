@@ -22,6 +22,8 @@ final class PrivacyTests: XCTestCase {
         "\\(known ? subrole : \"other\")": "a known AX subrole constant or 'other'",
         "\\(name)": "an AX attribute name constant",
         "\\(loose)": "a flag",
+        "\\(choice.label)": "typed, field, again or skip: a fixed label",
+        "\\(shown.label)": "same, whole, changed or pending: a fixed label, never the word",
         "\\(retype.deletions)": "how many characters a correction replaced: only for corrected words",
         "\\(code)": "HTTP status or 'offline'",
     ]

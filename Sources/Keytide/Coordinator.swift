@@ -2,6 +2,8 @@ import AppKit
 import ApplicationServices
 import KeytideCore
 
+// Lifecycle, key routing and shortcuts. The two correction paths live in Coordinator+Field.swift (readable fields of
+// whitelisted apps) and Coordinator+Typing.swift (everywhere else).
 final class Coordinator {
     let store: ProfileStore
     let sources = InputSources()
@@ -9,13 +11,17 @@ final class Coordinator {
     let tap = EventTap()
     let text = FocusedText()
     var onStatus: ((String) -> Void)?
-    // Internal, not private: the keystroke path lives in Coordinator+Typing.swift.
+    // The system's list of layouts changed while running: Settings shows the new list.
+    var onLayouts: (() -> Void)?
+    // Internal, not private: the correction paths live in the extensions.
     var corrections = 0
     var undos = 0
     var stale = 0
     var generation: UInt64 = 0
     var active: UUID?
     var undoRecord: UndoRecord?
+    // `UndoWindow.clock` of the last posted correction, on either path: each one replaces the previous undo state.
+    var correctedAt = -TimeInterval.infinity
     private var waitingForAccess = false
     private var stoppedForFailure = false
     // An Electron app came to the front: its accessibility tree is asked for at the first key typed there.
@@ -43,6 +49,10 @@ final class Coordinator {
             generation &+= 1
             if active == nil && sources.currentID != undoRecord?.targetSource { undoRecord = nil }
         }
+        sources.onListChange = { [weak self] in
+            guard let self else { return }
+            sources.reload(); apply(); onLayouts?()
+        }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(appChanged),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
@@ -65,6 +75,9 @@ final class Coordinator {
         InputDiagnostics.record("tap started map=\(sources.map != nil)")
         onStatus?(sources.map == nil ? tr("status.addLayouts") : tr("status.running"))
     }
+
+    // Correcting right now: false while paused, halted, without access or without both layouts.
+    var working: Bool { tap.isRunning && sources.map != nil }
 
     func stop() { tap.stop(); typing.releaseAccessibility { _ in true }; store.flush() }
     func retry() { stoppedForFailure = false; sources.reload(); spell.retry(); apply() }
@@ -94,12 +107,12 @@ final class Coordinator {
         generation &+= 1
         if preparePending { prepareFront() }
         if !repeated && shortcut(code, flags) { return true }
-        if !flags.intersection([.command, .control, .option]).isEmpty ||
-            [UInt16(48), 51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126].contains(code) {
-            undoRecord = nil
-            return false
+        switch KeyRole.of(code, flags: flags, repeated: repeated) {
+        case .edit: undoRecord = nil; return false
+        case .typing: return false
+        case .boundary: break
         }
-        guard !repeated, [UInt16(49), 36, 76].contains(code), active == nil, !spell.busy else { return false }
+        guard active == nil, !spell.busy else { return false }
         // No counter: differences between boundaries would show how many keys were typed, also in excluded apps.
         InputDiagnostics.record("boundary")
         let revision = generation
@@ -133,38 +146,10 @@ final class Coordinator {
         return false
     }
 
-    private func correctField(_ snapshot: TextSnapshot, revision: UInt64) {
-        InputDiagnostics.record("captured word")
-        _ = spell.analyze(snapshot.word.word, map: sources.map, protected: store.immune,
-                          spelling: store.profile.spelling) { [weak self] correction, available in
-            guard let self else { return }
-            InputDiagnostics.record("analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
-            guard available else { onStatus?(tr("status.dictionariesUnavailable")); return }
-            guard generation == revision, active == nil else { stale += 1; return }
-            guard let correction, let previous = sources.currentID,
-                  sources.entries.contains(where: { $0.id == previous }),
-                  let target = correction.kind == .layout ? sources.targetID(correction.language) : previous else { return }
-            guard let currentWord = text.text(snapshot.element, range: snapshot.word.range),
-                  Words.normalized(currentWord) == Words.normalized(snapshot.word.word) else { stale += 1; return }
-            let current = TextSnapshot(element: snapshot.element, pid: snapshot.pid, selection: snapshot.selection,
-                word: WordRange(word: currentWord, range: snapshot.word.range))
-            let replacement = currentWord == snapshot.word.word ? correction.replacement :
-                Words.applyCase(of: currentWord, to: correction.replacement)
-            replace(current, with: replacement, source: target, previous: previous) { [weak self] ok in
-                guard let self, ok else { return }
-                corrections += 1
-                undoRecord = UndoRecord(snapshot: current, replacement: replacement,
-                                        previousSource: previous, targetSource: target)
-                typing.forget()
-                onStatus?(correction.kind == .layout ? tr("status.layoutFixed") : tr("status.typoFixed"))
-            }
-        }
-    }
-
     private func shortcut(_ code: UInt16?, _ flags: Modifiers) -> Bool {
         guard store.profile.enabled, active == nil else { return false }
         let undo = store.profile.undo, protectBinding = store.profile.protect
-        if undo.keyCode == code && undo.modifiers == flags { return undoLast() }
+        if undo.keyCode == code && undo.modifiers == flags { return undoAllowed() && undoLast() }
         guard protectBinding.keyCode == code && protectBinding.modifiers == flags else { return false }
         guard store.profile.protectedWords.count < 10_000 else { onStatus?(tr("status.dictionaryFull")); return false }
         switch text.capture(boundary: false, exclusions: store.profile.excludedApps) {
@@ -197,120 +182,12 @@ final class Coordinator {
         onStatus?(tr("status.protected"))
     }
 
-    @discardableResult func undoLast(after: (() -> Void)? = nil) -> Bool {
-        if undoRecord == nil { return active == nil && typing.canUndo && undoTypedLater(then: false) }
-        guard let record = undoRecord, active == nil, sources.currentID == record.targetSource,
-              let current = text.selection(record.snapshot.element), current.length == 0,
-              current.location >= record.snapshot.word.range.location + record.replacement.utf16.count,
-              text.stillCurrent(record.snapshot, caret: current, word: record.replacement) else { return false }
-        let snapshot = TextSnapshot(element: record.snapshot.element, pid: record.snapshot.pid, selection: current,
-            word: WordRange(word: record.replacement, range: NSRange(location: record.snapshot.word.range.location,
-                length: record.replacement.utf16.count)))
-        replace(snapshot, with: record.snapshot.word.word, source: record.previousSource, previous: record.targetSource) { [weak self] ok in
-            guard let self, ok else { return }
-            undoRecord = nil
-            undos += 1
-            store.update { $0.recordUndo(record.snapshot.word.word) }
-            onStatus?(tr("status.restored"))
-            after?()
-        }
-        return true
-    }
-
-    private func replace(_ snapshot: TextSnapshot, with replacement: String, source: String, previous: String,
-                         completion: @escaping (Bool) -> Void) {
-        guard active == nil, text.stillCurrent(snapshot), sources.currentID == previous,
-              let keys = sources.keystrokes(replacement, source: source),
-              let key = keys.first,
-              let eventSource = CGEventSource(stateID: .privateState) else {
-            InputDiagnostics.record("replace preflight rejected"); completion(false); return
-        }
-        var events: [CGEvent] = []
-        let units = Array(replacement.utf16)
-        for down in [true, false] {
-            guard let event = CGEvent(keyboardEventSource: eventSource, virtualKey: key.key, keyDown: down) else {
-                completion(false); return
-            }
-            event.flags = key.shift ? [.maskShift, .maskNonCoalesced] : [.maskNonCoalesced]
-            event.setIntegerValueField(.eventSourceUserData, value: EventTap.marker)
-            units.withUnsafeBufferPointer { buffer in
-                event.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress!)
-            }
-            var readback = [UniChar](repeating: 0, count: units.count), length = 0
-            event.keyboardGetUnicodeString(maxStringLength: readback.count, actualStringLength: &length, unicodeString: &readback)
-            guard length == units.count, readback == units else { completion(false); return }
-            events.append(event)
-        }
-        InputDiagnostics.record("replace started")
-        let token = UUID()
-        active = token
-        let started = ProcessInfo.processInfo.systemUptime
-        let insertedCaret = NSRange(location: snapshot.word.range.location + replacement.utf16.count, length: 0)
-        let finalCaret = NSRange(location: snapshot.selection.location + replacement.utf16.count - snapshot.word.range.length, length: 0)
-        let selectedStates = [(snapshot.word.range, snapshot.word.word), (snapshot.selection, snapshot.word.word)]
-        let insertedStates = [(insertedCaret, replacement), (snapshot.word.range, snapshot.word.word),
-                              (snapshot.word.range, replacement)]
-        let confirmedStates = [(finalCaret, replacement), (insertedCaret, replacement)]
-        let restoredStates = [(snapshot.selection, snapshot.word.word), (snapshot.word.range, snapshot.word.word)]
-        let transaction = InputTransaction(perform: { [self] step in
-            guard active == token else { return .rejected }
-            var result = InputTransaction.Check.rejected
-            switch step {
-            case .prepare:
-                // TIS changes can collapse selection. Select the word afterwards.
-                if tap.withinGate && sources.select(source) && tap.withinGate &&
-                    text.stillCurrent(snapshot) && tap.withinGate && text.setSelection(snapshot.element, snapshot.word.range) {
-                    result = .ready
-                }
-            case .selected:
-                if tap.withinGate, sources.currentID == source,
-                   let state = text.matching(snapshot, states: selectedStates), tap.hasTime(InputTransaction.postingReserve) {
-                    result = state == 0 ? .ready : .waiting
-                }
-            case .inserted:
-                if tap.withinGate, sources.currentID == source,
-                   let state = text.matching(snapshot, states: insertedStates), tap.withinGate {
-                    if state != 0 { result = .waiting }
-                    else if text.setSelection(snapshot.element, finalCaret) { result = .ready }
-                }
-            case .confirmed:
-                if sources.currentID == source, let state = text.matching(snapshot, states: confirmedStates) {
-                    if state == 0 { result = .ready }
-                    else if tap.withinGate { result = .waiting }
-                }
-            case .restore:
-                // Runs only before posting. The editor may have recased the word or moved the caret meanwhile
-                // (TextEdit capitalizes a document's first word); user input is held, so put the caret back.
-                if (sources.currentID == source || sources.currentID == previous) && text.holdsWord(snapshot) &&
-                    text.setSelection(snapshot.element, snapshot.selection) && sources.select(previous) { result = .ready }
-            case .restored:
-                if sources.currentID == previous,
-                   let state = text.matching(snapshot, states: restoredStates, ignoringCase: true) {
-                    if state == 0 { result = .ready }
-                    else if tap.withinGate { result = .waiting }
-                }
-            }
-            InputDiagnostics.record("replace step=\(step) result=\(result) elapsed_ms=\(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))")
-            return result
-        }, post: {
-            InputDiagnostics.record("selection confirmed, posting replacement")
-            for event in events { event.postToPid(snapshot.pid) }
-        }, later: { work in
-            DispatchQueue.main.asyncAfter(deadline: .now() + InputTransaction.handoff, execute: work)
-        }, completion: { [self] outcome in
-            guard active == token else { return }
-            active = nil
-            let outcome = tap.finishGate(replay: outcome != .uncertain) ? outcome : .uncertain
-            InputDiagnostics.record("replace outcome=\(outcome) elapsed_ms=\(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))")
-            switch outcome {
-            case .confirmed: break
-            case .restored: onStatus?(tr("status.skipped"))
-            case .uncertain:
-                halt(tr("status.halt.uncertain"))
-            }
-            completion(outcome == .confirmed)
-        })
-        tap.beginGate(abort: transaction.expire, cancel: transaction.cancel)
-        transaction.start()
+    // The undo shortcut, unlike the deliberate Control+D, can be hit by accident: it acts only within `UndoWindow`
+    // of the last correction, and not after a scroll since then (a scroll voided the undo when it went through the
+    // tap). One lookup per press, nothing per scroll.
+    private func undoAllowed() -> Bool {
+        let now = UndoWindow.clock
+        return UndoWindow.isOpen(since: correctedAt, now: now) &&
+            CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .scrollWheel) > now - correctedAt
     }
 }

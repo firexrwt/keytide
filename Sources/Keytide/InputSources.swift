@@ -18,17 +18,23 @@ final class InputSources {
     private(set) var russian: Entry?
     private(set) var map: LayoutMap?
     var onChange: (() -> Void)?
-    private var observer: NSObjectProtocol?
+    // A layout was added to or removed from the system list: the cached entries and maps are stale.
+    var onListChange: (() -> Void)?
+    private var observers: [NSObjectProtocol] = []
     private var configuration = Profile()
     private var strokes: [String: [Character: Stroke]] = [:]
 
     init() {
-        observer = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
-            object: nil, queue: .main) { [weak self] _ in self?.onChange?() }
+        let center = DistributedNotificationCenter.default()
+        observers = [
+            center.addObserver(forName: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+                               object: nil, queue: .main) { [weak self] _ in self?.onChange?() },
+            center.addObserver(forName: Notification.Name(kTISNotifyEnabledKeyboardInputSourcesChanged as String),
+                               object: nil, queue: .main) { [weak self] _ in self?.onListChange?() },
+        ]
     }
 
-    deinit { if let observer { DistributedNotificationCenter.default().removeObserver(observer) } }
+    deinit { observers.forEach(DistributedNotificationCenter.default().removeObserver) }
 
     var currentID: String? {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return nil }

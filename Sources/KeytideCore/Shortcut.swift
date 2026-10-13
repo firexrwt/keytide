@@ -40,15 +40,31 @@ public struct Shortcut: Codable, Equatable {
 
 public struct ModifierTap {
     private var armed: Modifiers?
+    private var armedAt: TimeInterval = 0
     public init() {}
     public mutating func interrupt() { armed = nil }
-    public mutating func changed(_ flags: Modifiers, previous: Modifiers) -> Modifiers? {
+    // `now` and `lastScroll` share one clock. Scrolling is not tapped (every scroll event would pass through Keytide),
+    // so a scroll while the modifier was held is looked up once, on release, and disarms it like a key press would.
+    public mutating func changed(_ flags: Modifiers, previous: Modifiers, now: TimeInterval = 0,
+                                 lastScroll: () -> TimeInterval = { -.infinity }) -> Modifiers? {
         if flags.isEmpty, let armed, previous == armed {
             self.armed = nil
-            return armed
+            return lastScroll() < armedAt ? armed : nil
         }
-        if previous.isEmpty && flags.rawValue.nonzeroBitCount == 1 { armed = flags }
+        if previous.isEmpty && flags.rawValue.nonzeroBitCount == 1 { armed = flags; armedAt = now }
         else { armed = nil }
         return nil
     }
+}
+
+// The undo shortcut acts only this soon after a correction: a lone Option press much later is more likely a stray
+// press than a request to undo a word the user has long accepted. Checked when the shortcut fires, never by a timer.
+public enum UndoWindow {
+    public static let seconds: TimeInterval = 10
+    public static func isOpen(since corrected: TimeInterval, now: TimeInterval) -> Bool {
+        now >= corrected && now - corrected <= seconds
+    }
+    // Keeps running while the Mac sleeps (uptime does not): a correction made before closing the lid is not
+    // undoable after waking.
+    public static var clock: TimeInterval { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000 }
 }
