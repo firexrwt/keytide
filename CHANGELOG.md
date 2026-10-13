@@ -2,6 +2,27 @@
 
 All notable changes to Keytide, newest first. Each version's section is also the text of its GitHub release.
 
+## 0.1.7 - 2026-10-13
+
+### Fixed
+
+- 0.1.6 turned English one-letter tokens before a full stop or comma into Russian words (`p.` became "зю", `T.` "Ею", `c,` "сб"). A one-letter word now converts only when the keys around it are letters in the other layout (`b[` is "их", `e;` is "уж", `,s` is "бы"), not with `.`, `,` or a Shift character after it.
+- A quote or bracket typed as such in the current layout stays around the corrected word: `"дуеэы` becomes `"let's`, not `@let's`, and `еуф"` becomes `tea"` ([#2](https://github.com/firexrwt/keytide/issues/2)). A key that is punctuation only in the other layout still converts (`&` is the Apple Russian full stop). A known word after a quote is not converted: `"ну` stays.
+- `ghbdtn,` and `ghbdtn.` typed with the US comma and full stop keys become "привет," and "привет." again: when the whole run converts to no word, the word alone is converted and its punctuation kept, as before 0.1.6.
+- A letter that comes from a punctuation key must fit the case of the word: `rhs:` no longer becomes "крыЖ", `LF.` not "ДАю". CamelCase from letter keys (`шЗрщту` -> "iPhone") converts as before.
+- Typo fixes only for a plain word with sentence punctuation after it, as before 0.1.6: not in code spans, quotes or markup (`ECC**` stays).
+- A run opening with a backtick, a slash or a tilde, or closing with a backtick, is a code span, a command or a path and is left as typed (`` `rg` ``, `/gh`, `~/ws`). With Russian - PC on an ANSI keyboard, where "ё" is on the backtick key, words starting or ending with "ё" are not corrected there.
+- Markdown `**` after a word stays `**` in both directions (Apple Russian has no `*` key; its Shift+8 is `;`).
+- Words with punctuation keys inside are judged by the bundled lexicon, not by the macOS checker, which split `k.,k` into two known "k": "люблю" (and "бы", "жук") typed in the wrong layout are now corrected, although the 0.1.6 notes already said so. A known part of three or more letters still keeps the run as typed (`[the`, `,then`).
+- Undo of a field correction restores a word with the editor's smart quotes.
+- macOS autocorrect rewriting a word inside a field correction (TextEdit) no longer stops Keytide: a same-length rewrite, with the selection still where Keytide left it, puts the caret and the layout back and counts as a skipped word. Text that moved meanwhile still stops it.
+
+### Changed
+
+- A character the target layout has no key for (a kept `*` after a Russian word) is typed on the other layout's key, its text exact.
+- The decision logic moved to `Decision.swift` and `Edges.swift`, the rollback check to `Rollback.swift` (covered by tests), the field transaction's readbacks to `FocusedText+Readback.swift`.
+- Measured against 0.1.5 on the same 305,000 tokens of Russian and English notes, docs and code, with the bundled lexicon and the macOS checker: 7 more false layout corrections (abbreviations next to quotes or punctuation, such as `"ИИ"` or `СПб,`), 2 fewer false typo fixes; of the same words typed in the wrong layout 75.6% come out exactly right against 59.0%, and wrong outputs fall from 915 to 474 (Apple Russian) and from 5,036 to 503 (Russian - PC).
+
 ## 0.1.6 - 2026-10-13
 
 ### Fixed

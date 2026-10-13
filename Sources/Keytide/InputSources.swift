@@ -89,12 +89,17 @@ final class InputSources {
 
     func keystrokes(_ word: String, source: String) -> [Stroke]? {
         // A replacement may carry punctuation ("привет."): every character needs a key, the language is checked before.
-        guard !word.isEmpty, let keys = strokes[source] else { return nil }
-        let result = word.compactMap { keys[$0] }
+        // An undo puts back the field's smart quotes: they ride on the key of the plain quote, the text stays exact.
+        guard !word.isEmpty, strokes[source] != nil else { return nil }
+        let result = word.compactMap { stroke($0, source: source) ?? stroke(Character(Words.plainQuotes(String($0))), source: source) }
         return result.count == word.count ? result : nil
     }
 
-    func stroke(_ character: Character, source: String) -> Stroke? { strokes[source]?[character] }
+    // Every posted event carries its exact text; the key is only its vehicle. A character the target layout has no key
+    // for (a kept "*" after a Russian word: Apple Russian has none) rides on the other layout's key.
+    func stroke(_ character: Character, source: String) -> Stroke? {
+        strokes[source]?[character] ?? strokes.first { $0.key != source && $0.value[character] != nil }?.value[character]
+    }
 
     func select(_ id: String) -> Bool {
         if currentID == id { return true }

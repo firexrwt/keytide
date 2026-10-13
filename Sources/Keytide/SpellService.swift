@@ -70,7 +70,7 @@ final class SpellService {
         let word = Words.normalized(word)
         let key = language.rawValue + (correction ? ":c:" : ":v:") + word
         if let cached = cache[key] { return cached }
-        let known = lexicon?.contains(word) == true || isKnown(word, language)
+        let known = lexicon?.contains(word) == true || Words.checkable(word) && isKnown(word, language)
         var suggestion: String?
         if !known && correction && Words.isPlain(word) {
             let range = NSRange(location: 0, length: word.utf16.count)

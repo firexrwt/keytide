@@ -60,14 +60,26 @@ public enum Words {
         return (String(run[..<end]), String(run[end...]))
     }
 
+    // NSSpellChecker splits a word at punctuation and judges the pieces ("k.,k" reads as two known "k", ",s" as "s"):
+    // only letters, with apostrophes between them (don't), may be asked; anything else is known to the lexicon alone.
+    public static func checkable(_ word: String) -> Bool {
+        let characters = Array(word)
+        return characters.indices.allSatisfy { index in
+            characters[index].isLetter || characters[index] == "'" && index > 0 && index < characters.count - 1 &&
+                characters[index - 1].isLetter && characters[index + 1].isLetter
+        }
+    }
+
     // The word of a run read as typed, smart quotes undone: the key for protection and learning.
     public static func core(_ run: String) -> String { split(plainQuotes(run)).word }
 
     // What the keys of either layout type besides letters and digits: ASCII punctuation and symbols, "№", "§", "±".
-    // Not emoji or other symbols: a run ending in one is not a word.
+    // Not emoji or other symbols: a run ending in one is not a word. Not "_", "-", "=", "+": identifiers and
+    // expressions ("CYBR_"), and "--" may become a dash the Backspace count does not know.
     private static func isTypedPunctuation(_ character: Character) -> Bool {
         guard let scalar = character.unicodeScalars.first, character.unicodeScalars.count == 1 else { return false }
         switch scalar.value {
+        case 43, 45, 61, 95: return false
         case 33...47, 58...64, 91...96, 123...126, 0x2116, 167, 177: return true
         default: return false
         }
@@ -133,61 +145,5 @@ public enum Words {
         }
         let longer = a.count > b.count ? a : b, shorter = a.count > b.count ? b : a
         return Array(longer.dropFirst(i + 1)) == Array(shorter.dropFirst(i))
-    }
-}
-
-public enum Decision {
-    // The whole decision for one typed run. `verdict(word, language, wantCorrection)` asks the dictionaries: the
-    // app passes its cached checker, tests a word list.
-    public static func analyze(_ typed: String, map: LayoutMap?, protected: Set<String>, spelling: Bool,
-                               verdict: (String, Language, Bool) -> WordVerdict) -> Correction? {
-        let run = Words.plainQuotes(typed), word = Words.split(run).word
-        guard run.utf16.count >= 2, let language = Words.language(of: word),
-              !protected.contains(Words.normalized(word)) else { return nil }
-        let original = verdict(word, language, false)
-        // One known letter before punctuation keys may still be a word typed in the other layout.
-        guard !original.known || word.count < 2 else { return nil }
-        let target: Language = language == .en ? .ru : .en
-        let alternate = map?.convert(run, to: target)
-        let alternateVerdict = alternate.flatMap {
-            let converted = Words.split($0).word
-            guard Words.isCandidate(converted) else { return nil as WordVerdict? }
-            // Profile recognition is request-local: removing a word must take effect without retry.
-            return protected.contains(Words.normalized(converted)) ? WordVerdict(known: true) :
-                verdict(converted, target, false)
-        }
-        let detailed = alternateVerdict?.known == true || !spelling || word.utf16.count < 3 ? original :
-            verdict(word, language, true)
-        return choose(word: run, original: detailed, alternate: alternate, alternateVerdict: alternateVerdict,
-                      protected: protected, spelling: spelling)
-    }
-
-    // `run`: everything typed since the last space; `original` is the verdict on its word as typed (`Words.split`),
-    // `alternate` the whole run converted to the other layout and `alternateVerdict` the verdict on its word.
-    // A layout correction replaces the whole run; a spelling correction keeps the punctuation as typed.
-    public static func choose(word run: String, original: WordVerdict, alternate: String?,
-                              alternateVerdict: WordVerdict?, protected: Set<String>,
-                              spelling: Bool) -> Correction? {
-        let (word, trail) = Words.split(run)
-        // One letter before punctuation keys ("b[" is "их", "e;" is "уж") is no evidence of the typed reading.
-        guard run.utf16.count >= 2, let source = Words.language(of: word),
-              !protected.contains(Words.normalized(word)), !original.known || word.count < 2 else { return nil }
-        let target: Language = source == .en ? .ru : .en
-        if let alternate {
-            let converted = Words.split(alternate).word
-            if converted.utf16.count >= 2, Words.language(of: converted) == target, Words.isCandidate(converted),
-               alternateVerdict?.known == true || protected.contains(Words.normalized(converted)) {
-                return Correction(original: run, replacement: alternate, language: target, kind: .layout)
-            }
-        }
-        guard spelling, !original.known, word.utf16.count >= 3, Words.isPlain(word),
-              word == word.lowercased() || word == word.uppercased() || word == word.capitalized,
-              let suggestion = original.correction,
-              Words.language(of: suggestion) == source, Words.isPlain(suggestion),
-              Words.oneEditApart(word, suggestion), !protected.contains(Words.normalized(suggestion)) else {
-            return nil
-        }
-        let replacement = Words.applyCase(of: word, to: suggestion) + trail
-        return Correction(original: run, replacement: replacement, language: source, kind: .spelling)
     }
 }

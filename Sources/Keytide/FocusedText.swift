@@ -174,42 +174,6 @@ final class FocusedText {
                      element, loose: loose)
     }
 
-    func stillCurrent(_ snapshot: TextSnapshot, caret: NSRange? = nil, word: String? = nil) -> Bool {
-        matching(snapshot, states: [(caret ?? snapshot.selection, word ?? snapshot.word.word)]) == 0
-    }
-
-    // Same field and the word still at its range, ignoring case: the editor may recase it while a transaction is
-    // open (TextEdit capitalizes a document's first word). Only for rollback before anything was posted.
-    func holdsWord(_ snapshot: TextSnapshot) -> Bool {
-        guard !IsSecureEventInputEnabled(), NSWorkspace.shared.frontmostApplication?.processIdentifier == snapshot.pid,
-              let current = focused(), CFEqual(current, snapshot.element),
-              let content = text(current, range: snapshot.word.range) else { return false }
-        return Words.normalized(content) == Words.normalized(snapshot.word.word)
-    }
-
-    // Candidate states share one focus/metadata read; only known short words are compared.
-    func matching(_ snapshot: TextSnapshot, states: [(caret: NSRange, word: String)], ignoringCase: Bool = false) -> Int? {
-        guard !IsSecureEventInputEnabled(), NSWorkspace.shared.frontmostApplication?.processIdentifier == snapshot.pid,
-              let current = focused(), CFEqual(current, snapshot.element) else {
-            InputDiagnostics.record("context changed"); return nil
-        }
-        guard case .text(let actual) = inspect(current) else { return nil }
-        var lastLength = 0
-        var content: String?
-        for (index, state) in states.enumerated() where actual == state.caret {
-            let length = state.word.utf16.count
-            if length != lastLength {
-                lastLength = length
-                content = text(current, range: NSRange(location: snapshot.word.range.location, length: length))
-            }
-            if let content, ignoringCase ? Words.normalized(content) == Words.normalized(state.word) : content == state.word {
-                return index
-            }
-        }
-        InputDiagnostics.record("field state mismatch")
-        return nil
-    }
-
     func selection(_ element: AXUIElement) -> NSRange? {
         guard let object = attribute(element, kAXSelectedTextRangeAttribute) else { return nil }
         return Self.range(object)
@@ -244,7 +208,8 @@ final class FocusedText {
         return string
     }
 
-    private func focused() -> AXUIElement? {
+    // Internal, not private: the transaction readbacks live in FocusedText+Readback.swift.
+    func focused() -> AXUIElement? {
         guard let object = attribute(system, kAXFocusedUIElementAttribute), CFGetTypeID(object) == AXUIElementGetTypeID() else { return nil }
         return unsafeBitCast(object, to: AXUIElement.self)
     }
@@ -252,9 +217,9 @@ final class FocusedText {
     // `silent`: AX did not answer. `unknown(nil)`: AX answered and the focus has no text range, so it is not text.
     // `loose`: a text role whose subrole is not one the AX transaction was checked with (Raycast's field): good for
     // reading before blind keys, never for AX writes.
-    private enum Field { case text(NSRange), loose(NSRange), secure, unknown(NSRange?), silent }
+    enum Field { case text(NSRange), loose(NSRange), secure, unknown(NSRange?), silent }
 
-    private func inspect(_ element: AXUIElement) -> Field {
+    func inspect(_ element: AXUIElement) -> Field {
         let names = [kAXRoleAttribute, kAXSubroleAttribute, kAXSelectedTextRangeAttribute] as CFArray
         var result: CFArray?
         calls += 1

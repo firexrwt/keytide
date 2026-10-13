@@ -67,6 +67,20 @@ public enum ReleaseNotes {
                 "In Notes and TextEdit, words starting with э (the quote key) are corrected too.",
             ],
         ],
+        "0.1.7": [
+            "ru": [
+                "Английские сокращения, инициалы и списки снова остаются как набраны: «p.», «T.», «a, b, c» больше не превращаются в русские слова (ошибка 0.1.6).",
+                "Кавычки и скобки вокруг слова остаются такими, как вы их набрали: «“дуеэы» становится «“let's», а не «@let's».",
+                "Если автозамена macOS успела заменить слово на другое той же длины раньше Keytide, он больше не останавливается, а просто пропускает это слово.",
+                "Код в обратных кавычках, пути и команды («/gh», «~/») не трогаются, а «люблю», «бы» и «жук», набранные не в той раскладке, теперь действительно исправляются.",
+            ],
+            "en": [
+                "English abbreviations, initials and lists stay as typed again: p., T., a, b, c no longer turn into Russian words (a 0.1.6 bug).",
+                "Quotes and brackets around a word stay as you typed them: “дуеэы becomes “let's, not @let's.",
+                "When macOS autocorrect replaces a word with one of the same length before Keytide does, Keytide no longer stops: it just skips that word.",
+                "Code in backticks, paths and commands (/gh, ~/) are left alone, and люблю, бы and жук typed in the wrong layout are now really corrected.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

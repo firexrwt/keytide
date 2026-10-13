@@ -128,10 +128,15 @@ extension Coordinator {
                 if (sources.currentID == source || sources.currentID == previous) && text.holdsWord(snapshot) &&
                     text.setSelection(snapshot.element, snapshot.selection) && sources.select(previous) { result = .ready }
             case .restored:
-                if sources.currentID == previous,
-                   let state = text.matching(snapshot, states: restoredStates, ignoringCase: true) {
-                    if state == 0 { result = .ready }
-                    else if tap.withinGate { result = .waiting }
+                if sources.currentID == previous {
+                    if let state = text.matching(snapshot, states: restoredStates, ignoringCase: true) {
+                        if state == 0 { result = .ready }
+                        else if tap.withinGate { result = .waiting }
+                    } else if let caret = text.selection(snapshot.element), text.holdsWord(snapshot) {
+                        // The editor rewrote the word itself (autocorrect) before anything was posted: once the caret
+                        // is back, this is a skip, not a reason to stop. The caret setter may still be on its way.
+                        if caret == snapshot.selection { result = .ready } else if tap.withinGate { result = .waiting }
+                    }
                 }
             }
             InputDiagnostics.record("replace step=\(step) result=\(result) elapsed_ms=\(Int((ProcessInfo.processInfo.systemUptime - started) * 1000))")
