@@ -2,6 +2,21 @@
 
 All notable changes to Keytide, newest first. Each version's section is also the text of its GitHub release.
 
+## 0.1.8 - 2026-10-13
+
+### Added
+
+- Reading a word through the clipboard where a field shows its caret but hides its text from accessibility (apps that draw text themselves). Only for a word started after an edit (caret moved, Backspace, focus change), and only when the focused element reports an empty caret (`AXSelectedTextRange`) without a text role: no keys go to a focus that shows no caret, such as a game, an AX error or a timeout. Where the probe sends no key, the typed word is corrected from the keys as before. Not where macOS asks before or denies clipboard access (`NSPasteboard.accessBehavior`). Keytide first reads every clipboard item and type in full (refused for more than 16 items or 8 MB, or data its owner does not provide, so the clipboard is never put back incomplete; that clipboard is not read again until it changes), checks once the user's keys are held that neither the clipboard nor the caret moved, writes a host-only marker, selects up to the word's length plus 32 characters with Shift+Left, sends Command+C with the key the current layout uses for it (Dvorak moves it), reads the text, puts the clipboard back at once and collapses the selection with Right; keys pressed meanwhile are held and replayed. The caret must be back where it was, and the copy must end with the typed space, or nothing is corrected. The marker and the restored contents carry `org.nspasteboard.TransientType`, so history apps that honor it skip them; the copied text itself is written by the app and stayed on the clipboard for 4 to 23 ms in our measurements, so a clipboard history app may still catch it. A clipboard the app cleared but has not written yet is waited for (it holds nothing to leak); a copy that arrives after the 0.4 s wait is put back within 1.5 s unless the user presses a key or clicks, and macOS itself refuses a write by an app whose clear came before the restore. Never done over a copy marked `org.nspasteboard.ConcealedType` (password managers, whose clear timer would otherwise stop), and a concealed copy made during the probe is kept. An app that copies nothing is not probed again while it runs. Settings > General > "Read words through the clipboard where an app hides its text", on by default (owner decision: Keytide sends nothing and keeps data only as long as the job needs it); a malformed value in an imported profile turns it off.
+- The event tap refuses a second holder of its input gate instead of stopping the app.
+- A selected word for manual conversion is read through `AXSelectedText` when the field cannot give its range.
+
+### Changed
+
+- A field that does not answer for a range of its text (`AXStringForRange`) is read through `AXValue` when it holds at most 4,000 characters (measured first with `AXNumberOfCharacters`); the needed part is cut out and nothing is kept or logged. Such fields used to fall back to the blind keystroke path. Not after a timeout, which would wait twice.
+- When the system-wide query for the focused element fails, the app holding keyboard focus (`AXFocusedApplication`) is asked for its focused element instead of giving up on the field. Not the frontmost app: a hotkey panel takes the keys without becoming frontmost.
+- Both fallbacks were checked live by forcing them on in TextEdit (the field transaction) and Script Editor (the keystroke path): the same results as the normal path.
+- The clipboard read was checked live in a test window that draws its text itself: with only its caret exposed, `ghbdtn` became "привет" and `b[` "их", and the clipboard was byte-identical afterwards (the same with an app that writes its copy 30 ms after clearing); with no caret no key was sent and the word was corrected from the keys as in 0.1.7; an app that ignores Command+C was probed once and then left to the keys. Script Editor and TextEdit, whose fields answer, never used it.
+
 ## 0.1.7 - 2026-10-13
 
 ### Fixed

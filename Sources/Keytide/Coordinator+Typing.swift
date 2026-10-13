@@ -14,14 +14,25 @@ extension Coordinator {
             InputDiagnostics.record("keys retry refused: app changed"); return
         }
         if !retry { InputDiagnostics.record("keys typed") }
-        let resolved: Typed
-        switch typing.resolve(typed, app: app, last: retry) {
-        case .word(let word): resolved = word
+        switch typing.resolve(typed, app: app, last: retry, probe: store.profile.clipboard) {
+        case .word(let word): analyzeTyped(word, pid: pid, revision: revision)
         case .skip: return
         case .wait(let delay):
             later(delay, revision: revision) { [weak self] in self?.correctTyped(typed, revision: revision, owner: pid) }
-            return
+        case .probe:
+            typing.readThroughClipboard(typed, pid: pid) { [weak self] read, lost in
+                guard let self else { return }
+                if lost { halt(tr("status.halt.lostCorrection")); return }
+                switch read {
+                case .word(let word): analyzeTyped(word, pid: pid, revision: revision)
+                case .typed: if !typed.retype.run.isEmpty { analyzeTyped(typed, pid: pid, revision: revision) }
+                case .skip: return
+                }
+            }
         }
+    }
+
+    private func analyzeTyped(_ resolved: Typed, pid: pid_t, revision: UInt64) {
         let started = spell.analyze(resolved.retype.run, map: sources.map, protected: store.immune,
                                     spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }

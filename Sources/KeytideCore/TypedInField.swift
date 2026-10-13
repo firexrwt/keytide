@@ -52,6 +52,8 @@ public enum WordChoice: Equatable {
     case field(Retype)
     // Read the field once more after this delay.
     case again(TimeInterval)
+    // The field hides its text: read the word before the caret through the clipboard (`ClipboardProbe`).
+    case probe
     // Nothing is corrected; the reason is a literal, for diagnostics.
     case skip(String)
 
@@ -61,17 +63,33 @@ public enum WordChoice: Equatable {
     public static func needsField(_ typed: Retype, edited: Bool) -> Bool { edited || typed.run.isEmpty }
 
     // `last`: no more looks allowed. `treeRequested`: an Electron app was just asked for its accessibility tree.
-    public static func choose(_ answer: Answer, typed: Retype, last: Bool, treeRequested: Bool) -> WordChoice {
+    // `probe`: a field that does not answer may be read through the clipboard (the owner's setting), after the
+    // Electron tree had its chance.
+    public static func choose(_ answer: Answer, typed: Retype, last: Bool, treeRequested: Bool,
+                              probe: Bool = false) -> WordChoice {
         switch answer {
         case .read(.same): return .field(typed)
         case .read(.whole(let word)): return .field(word)
         case .read(.changed): return .skip("field shows another word")
         case .read(.pending) where !last: return .again(0.04)
         case .unanswered where treeRequested && !last: return .again(0.15)
+        case .unanswered where probe: return .probe
         case .refused(let reason): return .skip(reason)
         case .read(.pending), .unanswered: break
         }
         return typed.run.isEmpty ? .skip("no typed word") : .typed
+    }
+
+    // A word copied through the clipboard (`ClipboardProbe`). Its keys went in a fixed order, so a copy without the
+    // typed space means the field is not what was assumed (an editor ate the space, a foreign copy), never that it
+    // lags: no blind correction then.
+    public static func fromClipboard(_ shown: TypedInField, typed: Retype) -> WordChoice {
+        switch shown {
+        case .same: return .field(typed)
+        case .whole(let word): return .field(word)
+        case .changed: return .skip("field shows another word")
+        case .pending: return .skip("clipboard shows no space")
+        }
     }
 
     public var label: String {
@@ -79,6 +97,7 @@ public enum WordChoice: Equatable {
         case .typed: return "typed"
         case .field: return "field"
         case .again: return "again"
+        case .probe: return "probe"
         case .skip: return "skip"
         }
     }

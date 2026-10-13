@@ -23,15 +23,20 @@ final class KeystrokeCorrector {
     private let sources: InputSources
     private let text: FocusedText
     private let electron = ElectronAccess()
+    private let clipboard: ClipboardProbe
+    // Characters before the typed run and its space that the probe copies too: the start of a word the run may end.
+    private static let context = 32
+    // ponytail: never shrinks; pids of apps that ended stay, and a reused pid is not probed. Fine for a session.
+    private var copiesNothing = Set<pid_t>()
     private var undo: Undo?
 
     init(tap: EventTap, sources: InputSources, text: FocusedText) {
-        self.tap = tap; self.sources = sources; self.text = text
+        self.tap = tap; self.sources = sources; self.text = text; clipboard = ClipboardProbe(tap: tap)
     }
 
     func forget() { undo = nil }
 
-    enum Resolution { case word(Typed), wait(TimeInterval), skip }
+    enum Resolution { case word(Typed), wait(TimeInterval), probe, skip }
 
     // Electron apps get their accessibility tree as soon as they come to the front, so the first word typed there
     // can already be read.
@@ -45,7 +50,8 @@ final class KeystrokeCorrector {
     // right after a space is whole as typed (its tail is checked before posting). After an edit (click, caret key,
     // chord, app switch, Backspace past its start) the field names the whole word when it answers; a field that cannot
     // be read gets the typed run, and undoing that teaches nothing.
-    func resolve(_ typed: Typed, app: NSRunningApplication, last: Bool) -> Resolution {
+    // `probe`: a field that does not answer may be read through the clipboard (`readThroughClipboard`).
+    func resolve(_ typed: Typed, app: NSRunningApplication, last: Bool, probe: Bool) -> Resolution {
         guard WordChoice.needsField(typed.retype, edited: typed.edited) else { return .word(typed) }
         let answer: WordChoice.Answer, field: AXUIElement?
         switch text.typedInField(typed.retype, pid: app.processIdentifier) {
@@ -59,13 +65,53 @@ final class KeystrokeCorrector {
             answer = .refused(reason); field = nil
         }
         let requested = answer == .unanswered && electron.request(for: app, revive: true)
-        let choice = WordChoice.choose(answer, typed: typed.retype, last: last, treeRequested: requested)
+        let choice = WordChoice.choose(answer, typed: typed.retype, last: last, treeRequested: requested, probe: probe)
         InputDiagnostics.record("keys word \(choice.label)")
         switch choice {
         case .typed: return .word(typed)
         case .field(let word): return .word(Typed(retype: word, serial: typed.serial, field: field))
         case .again(let delay): return .wait(delay)
+        case .probe: return .probe
         case .skip(let reason): InputDiagnostics.record("keys refused reason=\(reason)"); return .skip
+        }
+    }
+
+    // `word`: read through the clipboard. `typed`: nothing was learned (no key sent, or nothing copied with the caret
+    // back in place), so the typed run decides as it did before 0.1.8 - a word is corrected wherever it stands.
+    enum ClipboardRead { case word(Typed), typed, skip }
+
+    // The word before the caret of a field that hides its text, copied through the clipboard: enough characters for
+    // the typed run, its space and the start of a word it may end (`TypedInField` finds the start). `lost`: the
+    // user's keys held meanwhile were dropped. Only to a focus that shows an empty caret (`probeCaret`), and the
+    // caret must be back there afterwards; an app that copied nothing is not probed again while it runs.
+    func readThroughClipboard(_ typed: Typed, pid: pid_t, completion: @escaping (_ read: ClipboardRead, _ lost: Bool) -> Void) {
+        func untouched(_ reason: String) { InputDiagnostics.record("keys clipboard skipped reason=\(reason)"); completion(.typed, false) }
+        func refuse(_ reason: String, lost: Bool) { InputDiagnostics.record("keys refused reason=\(reason)"); completion(.skip, lost) }
+        guard !copiesNothing.contains(pid) else { return untouched("app copied nothing before") }
+        guard case .at(let caret) = text.probeCaret(pid: pid) else { return untouched("no caret") }
+        let count = min(Words.maximumLength + 2, typed.retype.run.count + 1 + Self.context)
+        let back = { [text] in text.probeCaret(pid: pid) == .at(caret) }
+        clipboard.read(count, copyKey: sources.commandKey("c") ?? 8, since: typed.serial, stillThere: back) { [self] result, lost in
+            switch result {
+            case .refused: completion(.typed, lost)
+            case .nothing(let timedOut):
+                if timedOut { copiesNothing.insert(pid) }
+                // The selection collapsed back where it was, or the Backspaces would land elsewhere.
+                guard back() else { return refuse("caret moved", lost: lost) }
+                InputDiagnostics.record("keys clipboard gave nothing"); completion(.typed, lost)
+            case .copied(let copied):
+                guard back() else { return refuse("caret moved", lost: lost) }
+                // Longer than the selection: another writer, or a whole line copied without a selection.
+                guard copied.utf16.count <= count * 8 else { return refuse("clipboard holds something else", lost: lost) }
+                // The copy reaches the field start when it holds everything before the caret (AX counts UTF-16 units).
+                let shown = TypedInField.resolve(prefix: copied, fromFieldStart: copied.utf16.count >= caret, typed: typed.retype)
+                InputDiagnostics.record("keys clipboard read=\(shown.label)")
+                switch WordChoice.fromClipboard(shown, typed: typed.retype) {
+                case .field(let word): completion(.word(Typed(retype: word, serial: typed.serial)), lost)
+                case .skip(let reason): refuse(reason, lost: lost)
+                case .typed, .again, .probe: refuse("clipboard", lost: lost)
+                }
+            }
         }
     }
 

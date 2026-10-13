@@ -159,7 +159,9 @@ extension Coordinator {
             }
             completion(outcome == .confirmed)
         })
-        tap.beginGate(abort: transaction.expire, cancel: transaction.cancel)
+        guard tap.beginGate(abort: transaction.expire, cancel: transaction.cancel) else {
+            active = nil; InputDiagnostics.record("replace preflight rejected"); completion(false); return
+        }
         transaction.start()
     }
 }

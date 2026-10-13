@@ -89,6 +89,34 @@ final class TypedInFieldTests: XCTestCase {
                        .skip("secure field"))
     }
 
+    // A silent field is read through the clipboard when the owner allows it, after the Electron tree had its chance.
+    func testASilentFieldIsProbedThroughTheClipboardWhenAllowed() {
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: false, probe: true), .probe)
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: Retype(run: ""), last: true, treeRequested: false, probe: true),
+                       .probe, "a word the keys could not show")
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: true, probe: true),
+                       .again(0.15), "the Electron tree first")
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: false, probe: false), .typed)
+        XCTAssertEqual(WordChoice.choose(.refused("secure field"), typed: typed, last: true, treeRequested: false,
+                                         probe: true), .skip("secure field"), "never a secure field")
+        XCTAssertEqual(WordChoice.choose(.read(.changed), typed: typed, last: true, treeRequested: false, probe: true),
+                       .skip("field shows another word"), "a field that answered is not probed")
+        XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: true, treeRequested: true, probe: true), .probe,
+                       "the retry after the Electron tree still silent")
+        XCTAssertEqual(WordChoice.probe.label, "probe")
+    }
+
+    // What the clipboard showed decides alone: a copy without the typed space is never corrected blind.
+    func testAClipboardCopyIsTrustedOnlyWithTheTypedSpace() {
+        XCTAssertEqual(WordChoice.fromClipboard(.same, typed: typed), .field(typed))
+        let whole = Retype(run: "ghbdtn")
+        XCTAssertEqual(WordChoice.fromClipboard(.whole(whole), typed: typed), .field(whole))
+        XCTAssertEqual(WordChoice.fromClipboard(.changed, typed: typed), .skip("field shows another word"))
+        XCTAssertEqual(WordChoice.fromClipboard(.pending, typed: typed), .skip("clipboard shows no space"))
+        XCTAssertEqual(WordChoice.fromClipboard(TypedInField.resolve(prefix: "hello ghbdtn", fromFieldStart: true, typed: typed),
+                                                typed: typed), .skip("clipboard shows no space"))
+    }
+
     func testASlowFieldGetsExactlyOneMoreLook() {
         XCTAssertEqual(WordChoice.choose(.read(.pending), typed: typed, last: false, treeRequested: false), .again(0.04))
         XCTAssertEqual(WordChoice.choose(.unanswered, typed: typed, last: false, treeRequested: true), .again(0.15))

@@ -22,6 +22,23 @@ final class ProfileTests: XCTestCase {
         XCTAssertTrue(decoded.1.isEmpty)
     }
 
+    // 0.1.8: reading through the clipboard is on unless the profile turns it off; older profiles lack the key.
+    func testClipboardReadingDefaultsOnAndRoundTrips() throws {
+        var profile = Profile()
+        XCTAssertTrue(profile.clipboard)
+        profile.clipboard = false
+        XCTAssertFalse(try Profile.decode(JSONEncoder().encode(profile), complete: true).0.clipboard)
+        let older = Data(#"{"version":1,"enabled":true,"spelling":true,"learning":false,"undo":{"modifiers":4,"keyLabel":""},"protect":{"keyCode":2,"modifiers":8,"keyLabel":"D"},"protectedWords":[],"rejectedWords":{},"excludedApps":[]}"#.utf8)
+        XCTAssertTrue(try Profile.decode(older, complete: true).0.clipboard, "an export from 0.1.7 imports with the default")
+        let wrong = Data(#"{"version":1,"clipboard":"yes"}"#.utf8)
+        let decoded = try Profile.decode(wrong)
+        XCTAssertFalse(decoded.0.clipboard, "a malformed value never turns clipboard reading on")
+        XCTAssertTrue(decoded.1.contains("clipboard"), "a wrong type is reported")
+        var off = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(Profile())) as? [String: Any])
+        off["clipboard"] = false
+        XCTAssertFalse(try Profile.decode(JSONSerialization.data(withJSONObject: off), complete: true).0.clipboard)
+    }
+
     func testCompleteDecodeRejectsMinimalAndMisspelledSchemas() throws {
         let minimal = Data("{\"version\":1}".utf8)
         XCTAssertNoThrow(try Profile.decode(minimal))

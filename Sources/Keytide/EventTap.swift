@@ -108,7 +108,8 @@ final class EventTap {
     @discardableResult func beginGate(abort: @escaping () -> Void, cancel: @escaping () -> Void,
                                       since input: UInt64? = nil) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        precondition(held == nil)
+        // One holder at a time: a second one is refused, never stacked (the clipboard probe holds across main turns).
+        guard held == nil else { return false }
         if let input, input != inputSerial { return false }
         held = []; abortGate = abort; cancelGate = cancel
         gateSerial &+= 1

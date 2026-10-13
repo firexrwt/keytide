@@ -81,6 +81,18 @@ public enum ReleaseNotes {
                 "Code in backticks, paths and commands (/gh, ~/) are left alone, and люблю, бы and жук typed in the wrong layout are now really corrected.",
             ],
         ],
+        "0.1.8": [
+            "ru": [
+                "Keytide читает больше полей ввода: короткие поля, которые не отдают кусок текста, он читает целиком и сверяет слово, а не печатает вслепую.",
+                "Если macOS не ответила, какое поле в фокусе, Keytide спрашивает об этом само приложение и не теряет слово.",
+                "Где поле показывает курсор, но прячет текст, слово после перестановки курсора Keytide читает через буфер обмена и сразу возвращает ваш буфер. Менеджер истории буфера может успеть его сохранить; отключается в настройках.",
+            ],
+            "en": [
+                "Keytide reads more input fields: a short field that cannot give a piece of its text is read whole, so the word is checked instead of retyped blind.",
+                "When macOS does not say which field has the focus, Keytide asks the app itself and keeps the word.",
+                "Where a field shows its caret but hides its text, a word after you moved the caret is read through the clipboard, and your clipboard is put back at once. A clipboard history app may still catch it; turn this off in Settings.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

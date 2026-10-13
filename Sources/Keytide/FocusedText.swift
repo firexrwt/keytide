@@ -68,7 +68,9 @@ final class FocusedText {
         let word: WordRange
         if selection.length > 0 {
             guard !boundary else { return .blocked("selection") }
-            guard selection.length <= Words.maximumLength, let text = text(element, range: selection),
+            // The selection itself (AXSelectedText) when the field cannot give the range.
+            guard selection.length <= Words.maximumLength,
+                  let text = text(element, range: selection) ?? selectedText(element, length: selection.length),
                   Words.language(of: text) != nil else { return .unreadable("selected text") }
             word = WordRange(word: text, range: selection)
         } else {
@@ -203,14 +205,41 @@ final class FocusedText {
         guard let value = AXValueCreate(.cfRange, &cf) else { return nil }
         var output: CFTypeRef?
         calls += 1
-        guard AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString,
-            value, &output) == .success, let string = output as? String, string.utf16.count == range.length else { return nil }
-        return string
+        let error = AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString,
+                                                               value, &output)
+        if error == .success {
+            guard let string = output as? String, string.utf16.count == range.length else { return nil }
+            return string
+        }
+        // Some elements answer AXValue but not a range (KeyRay reads AXValue too). Only a short field, measured first,
+        // is read whole and sliced here; nothing of it is kept or logged. Not after a timeout: that would wait twice.
+        guard [.parameterizedAttributeUnsupported, .attributeUnsupported, .noValue].contains(error),
+              let count = attribute(element, kAXNumberOfCharactersAttribute) as? Int, count <= 4_000,
+              NSMaxRange(range) <= count, let whole = attribute(element, kAXValueAttribute) as? String,
+              whole.utf16.count == count else { return nil }
+        InputDiagnostics.record("AX text via value")
+        return (whole as NSString).substring(with: range)
     }
 
-    // Internal, not private: the transaction readbacks live in FocusedText+Readback.swift.
+    private func selectedText(_ element: AXUIElement, length: Int) -> String? {
+        guard let text = attribute(element, kAXSelectedTextAttribute) as? String, text.utf16.count == length else { return nil }
+        return text
+    }
+
+    // Internal, not private: the transaction readbacks live in FocusedText+Readback.swift. When the system-wide query
+    // fails, the app holding keyboard focus is asked for its focused element (as KeyRay does): one more call, only then.
+    // Not the frontmost app: a hotkey panel takes the keys without becoming frontmost.
     func focused() -> AXUIElement? {
-        guard let object = attribute(system, kAXFocusedUIElementAttribute), CFGetTypeID(object) == AXUIElementGetTypeID() else { return nil }
+        if let element = Self.element(attribute(system, kAXFocusedUIElementAttribute)) { return element }
+        guard let app = Self.element(attribute(system, kAXFocusedApplicationAttribute)) else { return nil }
+        AXUIElementSetMessagingTimeout(app, 0.012)
+        guard let element = Self.element(attribute(app, kAXFocusedUIElementAttribute)) else { return nil }
+        InputDiagnostics.record("AX focus via the focused app")
+        return element
+    }
+
+    private static func element(_ object: CFTypeRef?) -> AXUIElement? {
+        guard let object, CFGetTypeID(object) == AXUIElementGetTypeID() else { return nil }
         return unsafeBitCast(object, to: AXUIElement.self)
     }
 

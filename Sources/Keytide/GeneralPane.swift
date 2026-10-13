@@ -14,6 +14,7 @@ final class GeneralPane: NSObject {
     private let updates = NSButton(checkboxWithTitle: tr("settings.autoUpdates"), target: nil, action: nil)
     private let spelling = NSButton(checkboxWithTitle: tr("settings.spelling"), target: nil, action: nil)
     private let learning = NSButton(checkboxWithTitle: tr("settings.learning"), target: nil, action: nil)
+    private let clipboard = NSButton(checkboxWithTitle: tr("settings.clipboard"), target: nil, action: nil)
     private let undo = ShortcutRecorder(), protect = ShortcutRecorder()
     private let english = NSPopUpButton(), russian = NSPopUpButton()
 
@@ -22,6 +23,7 @@ final class GeneralPane: NSObject {
         super.init()
         for (control, action) in [(login, #selector(launchAtLogin)), (updates, #selector(automaticUpdates)),
                                   (spelling, #selector(options)), (learning, #selector(options)),
+                                  (clipboard, #selector(options)),
                                   (english, #selector(sources)), (russian, #selector(sources))] as [(NSControl, Selector)] {
             control.target = self; control.action = action
         }
@@ -31,6 +33,7 @@ final class GeneralPane: NSObject {
                  Form.row(Form.button(tr("settings.grantAccess"), self, #selector(permissions)),
                           Form.button(tr("settings.checkAccess"), self, #selector(retry))),
                  login, updates, spelling, learning, Form.label(tr("settings.learning.note")),
+                 clipboard, Form.label(tr("settings.clipboard.note")),
                  Form.row(Form.label("EN"), english, Form.label("RU"), russian),
                  Form.label(tr("settings.hotkeys"), bold: true),
                  Form.row(Form.label(tr("settings.undo")), undo, Form.label(tr("settings.protectWord")), protect),
@@ -52,6 +55,7 @@ final class GeneralPane: NSObject {
     func refresh() {
         spelling.state = store.profile.spelling ? .on : .off
         learning.state = store.profile.learning ? .on : .off
+        clipboard.state = store.profile.clipboard ? .on : .off
         updates.state = updater.automatic ? .on : .off
         undo.binding = store.profile.undo; protect.binding = store.profile.protect
         for (popup, language, selected) in [(english, Language.en, engine.sources.english?.id),
@@ -93,7 +97,11 @@ final class GeneralPane: NSObject {
     private func syncLogin() { login.state = SMAppService.mainApp.status == .enabled ? .on : .off }
     // Machine-local like the login item: not part of the portable profile.
     @objc private func automaticUpdates() { updater.setAutomatic(updates.state == .on) }
-    @objc private func options() { store.update { $0.spelling = spelling.state == .on; $0.learning = learning.state == .on } }
+    @objc private func options() {
+        store.update {
+            $0.spelling = spelling.state == .on; $0.learning = learning.state == .on; $0.clipboard = clipboard.state == .on
+        }
+    }
     @objc private func sources() {
         store.update { $0.englishSource = english.selectedItem?.representedObject as? String
                        $0.russianSource = russian.selectedItem?.representedObject as? String }

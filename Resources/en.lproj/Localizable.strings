@@ -88,6 +88,8 @@
 "settings.spelling" = "Fix obvious typos";
 "settings.learning" = "Learn from repeated undos";
 "settings.learning.note" = "After two undos a word stops being corrected. No text history is kept.";
+"settings.clipboard" = "Read words through the clipboard where an app hides its text";
+"settings.clipboard.note" = "Keytide selects the word before the caret (with up to 32 characters before it), copies it and puts your clipboard back at once. A clipboard history app may still catch the copied text in that moment.";
 "settings.hotkeys" = "Shortcuts";
 "settings.undo" = "Undo";
 "settings.protectWord" = "Protect word";

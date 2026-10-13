@@ -112,7 +112,14 @@ final class InputSources {
         return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
     }
 
-    private static func translate(_ key: UInt16, shift: Bool, source: TISInputSource) -> Character? {
+    // The key that types `character` with Command held in the current layout: apps match Command+C by its character,
+    // and Dvorak moves it (Russian and "Dvorak - QWERTY ⌘" give Command the Latin keys themselves).
+    func commandKey(_ character: Character) -> UInt16? {
+        let current = TISCopyCurrentKeyboardLayoutInputSource().takeRetainedValue()
+        return (0..<UInt16(128)).first { Self.translate($0, shift: false, command: true, source: current) == character }
+    }
+
+    private static func translate(_ key: UInt16, shift: Bool, command: Bool = false, source: TISInputSource) -> Character? {
         guard let object = property(source, kTISPropertyUnicodeKeyLayoutData), CFGetTypeID(object) == CFDataGetTypeID() else { return nil }
         let data = unsafeBitCast(object, to: CFData.self)
         guard let bytes = CFDataGetBytePtr(data) else { return nil }
@@ -120,7 +127,8 @@ final class InputSources {
         var dead: UInt32 = 0
         var length = 0
         var chars = [UniChar](repeating: 0, count: 4)
-        let result = UCKeyTranslate(layout, key, UInt16(kUCKeyActionDown), shift ? 2 : 0,
+        // Modifier state is the Carbon event modifiers >> 8: Command 1, Shift 2.
+        let result = UCKeyTranslate(layout, key, UInt16(kUCKeyActionDown), (shift ? 2 : 0) | (command ? 1 : 0),
             UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysMask), &dead, 4, &length, &chars)
         guard result == noErr, length > 0 else { return nil }
         let text = String(utf16CodeUnits: chars, count: length)

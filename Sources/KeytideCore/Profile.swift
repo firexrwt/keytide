@@ -6,6 +6,8 @@ public struct Profile: Codable, Equatable {
     public var enabled = true
     public var spelling = true
     public var learning = false
+    // Read the word through the clipboard where a field hides its text (`ClipboardProbe`), owner decision 2026-10-13.
+    public var clipboard = true
     public var undo = Shortcut.undo
     public var protect = Shortcut.protect
     public var protectedWords: [String] = []
@@ -51,15 +53,16 @@ public struct Profile: Codable, Equatable {
             let required: Set<String> = ["version", "enabled", "spelling", "learning", "undo", "protect",
                 "protectedWords", "rejectedWords", "excludedApps"]
             guard required.isSubset(of: Set(dict.keys)),
-                  Set(dict.keys).isSubset(of: required.union(["englishSource", "russianSource"])) else {
+                  Set(dict.keys).isSubset(of: required.union(["englishSource", "russianSource", "clipboard"])) else {
                 throw ProfileError.unsupported
             }
         }
         var result = Profile(), warnings: [String] = []
-        func boolean(_ key: String, _ fallback: Bool) -> Bool {
+        // `invalid`: the value for a key of the wrong type, when it must not be the default.
+        func boolean(_ key: String, _ fallback: Bool, invalid: Bool? = nil) -> Bool {
             guard let value = dict[key] else { return fallback }
             guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else {
-                warnings.append(key); return fallback
+                warnings.append(key); return invalid ?? fallback
             }
             return number.boolValue
         }
@@ -69,6 +72,8 @@ public struct Profile: Codable, Equatable {
         }
         result.spelling = boolean("spelling", true)
         result.learning = boolean("learning", false)
+        // A malformed import must not turn on a feature that touches the clipboard; a missing key keeps the default.
+        result.clipboard = boolean("clipboard", true, invalid: false)
         func shortcut(_ key: String, _ fallback: Shortcut) -> Shortcut {
             guard let object = dict[key] else { return fallback }
             guard JSONSerialization.isValidJSONObject(object),
