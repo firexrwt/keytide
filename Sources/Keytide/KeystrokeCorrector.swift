@@ -9,9 +9,9 @@ final class KeystrokeCorrector {
     // `lagging`: nothing posted, the field had not caught up with the keys; the caller may try once more.
     enum Outcome { case posted, skipped, lost, lagging }
     private struct Undo {
+        // Both whole runs, punctuation included.
         let original: String
         let replacement: String
-        let suffix: String
         let previousSource: String
         let targetSource: String
         let pid: pid_t
@@ -75,7 +75,7 @@ final class KeystrokeCorrector {
                               field: typed.field, previous: previous)
         if outcome == .posted {
             // Our own events never move the serial, so any later key press, even one held during the burst, voids the undo.
-            undo = Undo(original: typed.retype.word, replacement: replacement, suffix: typed.retype.suffix,
+            undo = Undo(original: typed.retype.run, replacement: replacement,
                         previousSource: previous, targetSource: source, pid: pid, serial: typed.serial,
                         learnable: !typed.edited)
         }
@@ -89,7 +89,7 @@ final class KeystrokeCorrector {
         guard let record = undo else { return nil }
         undo = nil
         guard eligible(record) else { InputDiagnostics.record("keys undo refused"); return nil }
-        let outcome = replace(Retype(word: record.replacement, suffix: record.suffix), with: record.original,
+        let outcome = replace(Retype(run: record.replacement), with: record.original,
                               source: record.previousSource, since: record.serial, pid: record.pid)
         return (record.original, outcome, record.learnable)
     }
@@ -103,7 +103,7 @@ final class KeystrokeCorrector {
     // again after the layout switch, right before posting; on refusal the layout goes back to `previous`.
     private func replace(_ retype: Retype, with replacement: String, source: String, since serial: UInt64,
                          pid: pid_t, field: AXUIElement? = nil, previous: String? = nil) -> Outcome {
-        let tail = retype.text(retype.word)
+        let tail = retype.text(retype.run)
         if let reason = text.keystrokeRefusal(expecting: tail, pid: pid, field: field) {
             if reason == FocusedText.lagging { InputDiagnostics.record("keys field behind the keys"); return .lagging }
             return refuse(reason)

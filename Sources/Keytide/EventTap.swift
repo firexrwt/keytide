@@ -231,7 +231,7 @@ final class EventTap {
                 // name it. An empty word (double space) needs no field read at all.
                 guard code == 49, flags.intersection([.command, .control, .option]).isEmpty,
                       word.finishedUnknown else { return nil }
-                return Typed(retype: Retype(word: "", suffix: ""), serial: serial, edited: true)
+                return Typed(retype: Retype(run: ""), serial: serial, edited: true)
             }
             return Typed(retype: retype, serial: serial, edited: word.finishedAfterEdit)
         case .keyUp, .flagsChanged: return nil

@@ -2,14 +2,14 @@ import XCTest
 @testable import KeytideCore
 
 final class TypedInFieldTests: XCTestCase {
-    private let typed = Retype(word: "ghbdtn", suffix: "")
+    private let typed = Retype(run: "ghbdtn")
 
     func testTheTypedWordIsWholeWhereverItStands() {
         XCTAssertEqual(TypedInField.resolve(prefix: "ghbdtn ", fromFieldStart: true, typed: typed), .same)
         XCTAssertEqual(TypedInField.resolve(prefix: "one two ghbdtn ", fromFieldStart: false, typed: typed), .same)
         XCTAssertEqual(TypedInField.resolve(prefix: "line\nghbdtn ", fromFieldStart: false, typed: typed), .same)
         XCTAssertEqual(TypedInField.resolve(prefix: "ghbdtn?! ", fromFieldStart: true,
-                                            typed: Retype(word: "ghbdtn", suffix: "?!")), .same)
+                                            typed: Retype(run: "ghbdtn?!")), .same)
     }
 
     func testContenteditableNoBreakSpacesCountAsSpaces() {
@@ -20,17 +20,25 @@ final class TypedInFieldTests: XCTestCase {
     func testTypingTheEndOfAnExistingWordTakesTheWholeWord() {
         // Clicked after "gh" in the text and typed "bdtn ": the word in the field is "ghbdtn".
         XCTAssertEqual(TypedInField.resolve(prefix: "one ghbdtn ", fromFieldStart: true,
-                                            typed: Retype(word: "bdtn", suffix: "")),
-                       .whole(Retype(word: "ghbdtn", suffix: "")))
-        XCTAssertEqual(TypedInField.resolve(prefix: "ghbdtn! ", fromFieldStart: true, typed: Retype(word: "n", suffix: "!")),
-                       .whole(Retype(word: "ghbdtn", suffix: "!")))
+                                            typed: Retype(run: "bdtn")),
+                       .whole(Retype(run: "ghbdtn")))
+        XCTAssertEqual(TypedInField.resolve(prefix: "ghbdtn! ", fromFieldStart: true, typed: Retype(run: "n!")),
+                       .whole(Retype(run: "ghbdtn!")))
+    }
+
+    // Notes and TextEdit turn the typed "'" and "\"" (э, Э) into smart quotes: still the typed run.
+    func testSmartQuotesInTheFieldAreTheTypedQuoteKeys() {
+        XCTAssertEqual(TypedInField.resolve(prefix: "one \u{2018}[jv ", fromFieldStart: false, typed: Retype(run: "'[jv")),
+                       .same)
+        XCTAssertEqual(TypedInField.resolve(prefix: "one \u{201C}[jv ", fromFieldStart: false, typed: Retype(run: "[jv")),
+                       .whole(Retype(run: "\"[jv")))
     }
 
     func testAWordTheKeysCouldNotShowComesFromTheField() {
         // After a chord (select all, paste) the key stream does not know the word; the field does.
-        let unknown = Retype(word: "", suffix: "")
+        let unknown = Retype(run: "")
         XCTAssertEqual(TypedInField.resolve(prefix: "one ghbdtn ", fromFieldStart: false, typed: unknown),
-                       .whole(Retype(word: "ghbdtn", suffix: "")))
+                       .whole(Retype(run: "ghbdtn")))
         XCTAssertEqual(TypedInField.resolve(prefix: "one  ", fromFieldStart: true, typed: unknown), .changed)
         XCTAssertEqual(TypedInField.resolve(prefix: " ", fromFieldStart: true, typed: unknown), .changed)
     }
@@ -51,17 +59,17 @@ final class TypedInFieldTests: XCTestCase {
 
     func testAWordCutByTheReadWindowIsUnknown() {
         // The read starts mid-word: the start of the word is not known, so nothing is replaced.
-        XCTAssertEqual(TypedInField.resolve(prefix: "hbdtn ", fromFieldStart: false, typed: Retype(word: "dtn", suffix: "")),
+        XCTAssertEqual(TypedInField.resolve(prefix: "hbdtn ", fromFieldStart: false, typed: Retype(run: "dtn")),
                        .changed)
         let long = String(repeating: "a", count: Words.maximumLength + 1)
-        XCTAssertEqual(TypedInField.resolve(prefix: long + " ", fromFieldStart: true, typed: Retype(word: "a", suffix: "")),
+        XCTAssertEqual(TypedInField.resolve(prefix: long + " ", fromFieldStart: true, typed: Retype(run: "a")),
                        .changed)
     }
 
     func testOnlyAWordAfterAnEditOrAnUnknownWordReadsTheField() {
         XCTAssertFalse(WordChoice.needsField(typed, edited: false))
         XCTAssertTrue(WordChoice.needsField(typed, edited: true))
-        XCTAssertTrue(WordChoice.needsField(Retype(word: "", suffix: ""), edited: false))
+        XCTAssertTrue(WordChoice.needsField(Retype(run: ""), edited: false))
     }
 
     // Owner rule: position never decides. A word started after a click is corrected even where the field is silent.
@@ -72,7 +80,7 @@ final class TypedInFieldTests: XCTestCase {
     }
 
     func testTheFieldNamesTheWholeWordOrVetoes() {
-        let whole = Retype(word: "pdtplysq", suffix: "")
+        let whole = Retype(run: "pdtplysq")
         XCTAssertEqual(WordChoice.choose(.read(.same), typed: typed, last: false, treeRequested: false), .field(typed))
         XCTAssertEqual(WordChoice.choose(.read(.whole(whole)), typed: typed, last: false, treeRequested: false), .field(whole))
         XCTAssertEqual(WordChoice.choose(.read(.changed), typed: typed, last: false, treeRequested: false),
@@ -87,7 +95,7 @@ final class TypedInFieldTests: XCTestCase {
     }
 
     func testAWordTheKeysCouldNotShowNeedsTheField() {
-        let empty = Retype(word: "", suffix: "")
+        let empty = Retype(run: "")
         XCTAssertEqual(WordChoice.choose(.unanswered, typed: empty, last: true, treeRequested: false), .skip("no typed word"))
         XCTAssertEqual(WordChoice.choose(.read(.whole(typed)), typed: empty, last: false, treeRequested: false), .field(typed))
     }

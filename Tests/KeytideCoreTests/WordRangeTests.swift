@@ -10,10 +10,13 @@ final class WordRangeTests: XCTestCase {
         XCTAssertEqual(result?.range, NSRange(location: 43, length: 6))
     }
 
-    func testPrecedingReturnsWordBeforePunctuationAndWhitespace() {
+    // The whole run before the space, punctuation included: punctuation keys are letters in the other layout.
+    func testPrecedingReturnsTheWholeRunBeforeWhitespace() {
         let result = WordRange.preceding(in: "hello!!! ", offset: 0, requireBoundary: true)
-
-        XCTAssertEqual(result, WordRange(word: "hello", range: NSRange(location: 0, length: 5)))
+        XCTAssertEqual(result, WordRange(word: "hello!!!", range: NSRange(location: 0, length: 8)))
+        XCTAssertEqual(WordRange.preceding(in: "one yj; ", offset: 0, requireBoundary: true)?.word, "yj;")
+        XCTAssertEqual(WordRange.preceding(in: "one >kbnm ", offset: 0, requireBoundary: true)?.word, ">kbnm")
+        XCTAssertEqual(WordRange.preceding(in: "one \u{2018}[jv ", offset: 0, requireBoundary: true)?.word, "\u{2018}[jv")
     }
 
     func testPrecedingReadsCurrentWordWhenBoundaryIsNotRequired() {

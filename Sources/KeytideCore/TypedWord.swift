@@ -61,8 +61,7 @@ public struct TypedWord {
         finishedUnknown = !known
         defer { restart() }
         guard let typed = current else { return nil }
-        let retype = Retype(typed: typed)
-        return retype.word.isEmpty ? nil : retype
+        return Retype(run: typed)
     }
 
     // Arrows and function keys report Private Use characters; Tab, Escape and Delete report controls.
@@ -74,26 +73,14 @@ public struct TypedWord {
     }
 }
 
+// Everything typed since the last space, punctuation included: the keystroke path replaces exactly this run, since
+// punctuation keys mean other characters in the other layout ("yj;" is "нож", not "но;").
 public struct Retype: Equatable {
-    public let word: String
-    public let suffix: String
+    public let run: String
 
-    public init(word: String, suffix: String) { self.word = word; self.suffix = suffix }
-
-    // Keep the explicit closure: `allSatisfy(Words.trailingPunctuation.contains)` here returned the inverse in
-    // release builds called from another module (Swift 6.4, 2026-10-10), while debug tests passed.
-    public init(typed: String) {
-        var split = typed.endIndex
-        while split > typed.startIndex {
-            let before = typed.index(before: split)
-            guard typed[before].unicodeScalars.allSatisfy({ Words.trailingPunctuation.contains($0) }) else { break }
-            split = before
-        }
-        word = String(typed[..<split])
-        suffix = String(typed[split...])
-    }
+    public init(run: String) { self.run = run }
 
     // Backspaces for the typed characters plus the boundary space the app already received.
-    public var deletions: Int { word.count + suffix.count + 1 }
-    public func text(_ replacement: String) -> String { replacement + suffix + " " }
+    public var deletions: Int { run.count + 1 }
+    public func text(_ replacement: String) -> String { replacement + " " }
 }

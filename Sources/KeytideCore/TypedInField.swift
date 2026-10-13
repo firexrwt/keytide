@@ -24,11 +24,11 @@ public enum TypedInField: Equatable {
             start = text.index(before: start)
         }
         guard start > text.startIndex || fromFieldStart else { return .changed }
-        let token = String(String.UnicodeScalarView(text[start...]))
+        // Editors may have turned the typed "'" and "\"" into smart quotes: the same keys, the same run.
+        let token = Words.plainQuotes(String(String.UnicodeScalarView(text[start...])))
         // An empty run is a word the key stream could not show (after a chord): the field alone names it.
-        let run = typed.word + typed.suffix
-        guard !token.isEmpty, token.count <= Words.maximumLength, token.hasSuffix(run) else { return .changed }
-        return token == run ? .same : .whole(Retype(typed: token))
+        guard !token.isEmpty, token.count <= Words.maximumLength, token.hasSuffix(typed.run) else { return .changed }
+        return token == typed.run ? .same : .whole(Retype(run: token))
     }
 
     // For diagnostics: the case only, never the word.
@@ -58,7 +58,7 @@ public enum WordChoice: Equatable {
     public enum Answer: Equatable { case read(TypedInField), unanswered, refused(String) }
 
     // A word typed right after a space is whole as typed: the field is not read at all.
-    public static func needsField(_ typed: Retype, edited: Bool) -> Bool { edited || typed.word.isEmpty }
+    public static func needsField(_ typed: Retype, edited: Bool) -> Bool { edited || typed.run.isEmpty }
 
     // `last`: no more looks allowed. `treeRequested`: an Electron app was just asked for its accessibility tree.
     public static func choose(_ answer: Answer, typed: Retype, last: Bool, treeRequested: Bool) -> WordChoice {
@@ -71,7 +71,7 @@ public enum WordChoice: Equatable {
         case .refused(let reason): return .skip(reason)
         case .read(.pending), .unanswered: break
         }
-        return typed.word.isEmpty ? .skip("no typed word") : .typed
+        return typed.run.isEmpty ? .skip("no typed word") : .typed
     }
 
     public var label: String {

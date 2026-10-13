@@ -32,7 +32,9 @@ public struct Profile: Codable, Equatable {
 
     public mutating func forget(_ word: String) { rejectedWords[Words.normalized(word)] = nil }
 
-    public mutating func recordUndo(_ word: String) {
+    // `run`: what was typed, punctuation included; its word is what is learned.
+    public mutating func recordUndo(_ run: String) {
+        let word = Words.core(run)
         guard learning, Words.language(of: word) != nil else { return }
         let key = Words.normalized(word)
         guard rejectedWords.count < 2_500 || rejectedWords[key] != nil else { return }

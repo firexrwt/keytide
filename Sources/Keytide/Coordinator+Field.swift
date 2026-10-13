@@ -13,14 +13,22 @@ extension Coordinator {
             InputDiagnostics.record("analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
             guard available else { onStatus?(tr("status.dictionariesUnavailable")); return }
             guard generation == revision, active == nil else { stale += 1; return }
-            guard let correction, let previous = sources.currentID,
-                  sources.entries.contains(where: { $0.id == previous }),
-                  let target = correction.kind == .layout ? sources.targetID(correction.language) : previous else { return }
-            guard let currentWord = text.text(snapshot.element, range: snapshot.word.range),
-                  Words.normalized(currentWord) == Words.normalized(snapshot.word.word) else { stale += 1; return }
+            guard let correction else { return }
+            guard let previous = sources.currentID, sources.entries.contains(where: { $0.id == previous }),
+                  let target = correction.kind == .layout ? sources.targetID(correction.language) : previous else {
+                InputDiagnostics.record("field refused reason=layout unavailable"); return
+            }
+            guard let currentWord = text.text(snapshot.element, range: snapshot.word.range) else {
+                stale += 1; InputDiagnostics.record("field refused reason=word unreadable"); return
+            }
+            // TextEdit may still turn a typed quote into a smart one after the capture: the same key, the same word.
+            let typedNow = Words.plainQuotes(currentWord), typedThen = Words.plainQuotes(snapshot.word.word)
+            guard Words.normalized(typedNow) == Words.normalized(typedThen) else {
+                stale += 1; InputDiagnostics.record("field refused reason=word changed after capture"); return
+            }
             let current = TextSnapshot(element: snapshot.element, pid: snapshot.pid, selection: snapshot.selection,
                 word: WordRange(word: currentWord, range: snapshot.word.range))
-            let replacement = currentWord == snapshot.word.word ? correction.replacement :
+            let replacement = typedNow == typedThen ? correction.replacement :
                 Words.applyCase(of: currentWord, to: correction.replacement)
             replace(current, with: replacement, source: target, previous: previous) { [weak self] ok in
                 guard let self, ok else { return }

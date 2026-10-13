@@ -15,10 +15,10 @@ final class TypedWordTests: XCTestCase {
 
     func testFinishReturnsWordAndRestarts() {
         var word = typed("ghbdtn")
-        XCTAssertEqual(word.finish(), Retype(word: "ghbdtn", suffix: ""))
+        XCTAssertEqual(word.finish(), Retype(run: "ghbdtn"))
         XCTAssertNil(word.finish())
         word.append("l"); word.append("f")
-        XCTAssertEqual(word.finish()?.word, "lf")
+        XCTAssertEqual(word.finish()?.run,"lf")
     }
 
     func testDeleteBackwardEditsWordAndEmptyDeleteKeepsTracking() {
@@ -29,7 +29,7 @@ final class TypedWordTests: XCTestCase {
         var older = TypedWord()
         older.deleteBackward(); older.deleteBackward()
         older.append("l"); older.append("f")
-        XCTAssertEqual(older.finish()?.word, "lf")
+        XCTAssertEqual(older.finish()?.run,"lf")
     }
 
     func testInvalidateHoldsUntilBoundaryAndRestartClears() {
@@ -38,7 +38,7 @@ final class TypedWordTests: XCTestCase {
         XCTAssertNil(word.finish())
         var line = typed("ghb")
         line.invalidate(); line.restart(); line.append("l"); line.append("f")
-        XCTAssertEqual(line.finish()?.word, "lf")
+        XCTAssertEqual(line.finish()?.run,"lf")
     }
 
     func testNonTextKeysStartANewWord() {
@@ -47,7 +47,7 @@ final class TypedWordTests: XCTestCase {
             var word = typed("gh")
             word.append(text)
             word.append("l"); word.append("f")
-            XCTAssertEqual(word.finish()?.word, "lf", "\(text.unicodeScalars.map(\.value))")
+            XCTAssertEqual(word.finish()?.run,"lf", "\(text.unicodeScalars.map(\.value))")
         }
     }
 
@@ -58,10 +58,10 @@ final class TypedWordTests: XCTestCase {
             var word = typed("gh")
             word.append(text)
             word.append("l"); word.append("f")
-            XCTAssertEqual(word.finish()?.word, "lf")
+            XCTAssertEqual(word.finish()?.run,"lf")
             XCTAssertTrue(word.finishedAfterEdit, "\(text.unicodeScalars.map(\.value))")
             word.append("d"); word.append("f")
-            XCTAssertEqual(word.finish()?.word, "df")
+            XCTAssertEqual(word.finish()?.run,"df")
             XCTAssertFalse(word.finishedAfterEdit, "the boundary re-synchronizes the word with the field")
         }
     }
@@ -78,7 +78,7 @@ final class TypedWordTests: XCTestCase {
         XCTAssertFalse(inside.finishedAfterEdit, "Backspace inside the typed word is tracked exactly")
         var clicked = typed("gh")
         clicked.relocate(); clicked.append("l"); clicked.append("f")
-        XCTAssertEqual(clicked.finish()?.word, "lf")
+        XCTAssertEqual(clicked.finish()?.run,"lf")
         XCTAssertTrue(clicked.finishedAfterEdit)
     }
 
@@ -114,7 +114,7 @@ final class TypedWordTests: XCTestCase {
         // fn / Globe switches the layout as key code 179 with an empty string.
         var word = typed("lf")
         XCTAssertNil(word.key(179, [], text: ""))
-        XCTAssertEqual(word.finish()?.word, "lf")
+        XCTAssertEqual(word.finish()?.run,"lf")
     }
 
     func testUnreadableKeyStringMakesWordUnknown() {
@@ -137,41 +137,40 @@ final class TypedWordTests: XCTestCase {
         XCTAssertNil(word.finish())
     }
 
-    func testSplitsTrailingPunctuationLikeWordRange() {
+    // Punctuation keys are letters in the other layout ("yj;" is "нож"): the whole run is replaced, punctuation and all.
+    func testTheWholeRunIsReplacedPunctuationIncluded() {
         var word = typed("ghbdtn?!")
         let retype = word.finish()
-        XCTAssertEqual(retype, Retype(word: "ghbdtn", suffix: "?!"))
+        XCTAssertEqual(retype, Retype(run: "ghbdtn?!"))
         XCTAssertEqual(retype?.deletions, 9)
-        XCTAssertEqual(retype?.text("привет"), "привет?! ")
+        XCTAssertEqual(retype?.text("привет,!"), "привет,! ")
         var inner = typed("hf,jnf")
-        XCTAssertEqual(inner.finish(), Retype(word: "hf,jnf", suffix: ""))
-        var only = typed("?!")
-        XCTAssertNil(only.finish())
+        XCTAssertEqual(inner.finish(), Retype(run: "hf,jnf"))
     }
 
     func testTracksCyrillicLikeLatin() {
         var word = typed("руддщ")
         word.deleteBackward()
-        XCTAssertEqual(word.finish(), Retype(word: "рудд", suffix: ""))
+        XCTAssertEqual(word.finish(), Retype(run: "рудд"))
     }
 
     func testDeletionsCoverWordAndBoundarySpace() {
-        XCTAssertEqual(Retype(word: "lf", suffix: "").deletions, 3)
-        XCTAssertEqual(Retype(word: "lf", suffix: "").text("да"), "да ")
+        XCTAssertEqual(Retype(run: "lf").deletions, 3)
+        XCTAssertEqual(Retype(run: "lf").text("да"), "да ")
     }
 
     func testKeyMapsBoundariesEditsAndShortcuts() {
         var word = TypedWord()
         XCTAssertNil(word.key(5, [], text: "g"))
         XCTAssertNil(word.key(4, [], text: "h"))
-        XCTAssertEqual(word.key(49, .shift, text: self.unexpectedText()), Retype(word: "gh", suffix: ""))
+        XCTAssertEqual(word.key(49, .shift, text: self.unexpectedText()), Retype(run: "gh"))
         _ = word.key(37, [], text: "l"); _ = word.key(3, [], text: "f")
         _ = word.key(51, [], text: self.unexpectedText())
         XCTAssertEqual(word.current, "l")
         _ = word.key(36, [], text: self.unexpectedText())
         XCTAssertNil(word.current, "Return starts a known empty word")
         _ = word.key(37, [], text: "l"); _ = word.key(3, [], text: "f")
-        XCTAssertEqual(word.key(49, [], text: " ")?.word, "lf")
+        XCTAssertEqual(word.key(49, [], text: " ")?.run,"lf")
         _ = word.key(37, [], text: "l")
         _ = word.key(2, .control, text: self.unexpectedText())
         XCTAssertNil(word.key(49, [], text: " "), "a shortcut may edit the field: what came before it is dropped")
@@ -179,7 +178,7 @@ final class TypedWordTests: XCTestCase {
         XCTAssertNil(word.key(49, .command, text: self.unexpectedText()), "Cmd+Space is not a boundary")
         // Letters typed after a chord (Cmd+Space opening Raycast, Cmd+A) are a known run, marked as an edit.
         _ = word.key(37, [], text: "l"); _ = word.key(3, [], text: "f")
-        XCTAssertEqual(word.key(49, [], text: " ")?.word, "lf")
+        XCTAssertEqual(word.key(49, [], text: " ")?.run,"lf")
         XCTAssertTrue(word.finishedAfterEdit)
     }
 }

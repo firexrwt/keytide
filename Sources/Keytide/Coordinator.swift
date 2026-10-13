@@ -166,17 +166,19 @@ final class Coordinator {
         case .blocked: return false
         case .unreadable:
             if typing.canUndo { return undoTypedLater(then: true) }
-            guard let typed = tap.typedWord().map(Retype.init(typed:)), Words.language(of: typed.word) != nil,
+            guard let typed = tap.typedWord(), Words.language(of: Words.core(typed)) != nil,
                   let pid = text.inputOwner()?.processIdentifier,
                   text.keystrokeRefusal(expecting: nil, pid: pid) == nil else { return false }
-            protect(typed.word)
+            protect(typed)
             return true
         }
     }
 
-    func protect(_ word: String) {
+    // `run`: a typed run or a word read from the field; its word, without the punctuation after it, is protected.
+    func protect(_ run: String) {
+        let key = Words.normalized(Words.core(run))
+        guard !key.isEmpty else { return }
         store.update { profile in
-            let key = Words.normalized(word)
             if !profile.protectedWords.contains(key) { profile.protectedWords.append(key); profile.protectedWords.sort() }
         }
         onStatus?(tr("status.protected"))

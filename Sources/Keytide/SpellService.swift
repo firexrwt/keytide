@@ -25,9 +25,11 @@ final class SpellService {
     }
 
     // Only this serial worker calls the singleton, with an explicit language and no global language changes.
-    func analyze(_ word: String, map: LayoutMap?, protected: Set<String>, spelling: Bool,
+    // `typed`: the run since the last space, punctuation included (see `Decision.analyze`).
+    func analyze(_ typed: String, map: LayoutMap?, protected: Set<String>, spelling: Bool,
                  completion: @escaping (Correction?, Bool) -> Void) -> Bool {
-        guard !busy, word.utf16.count >= 2, let language = Words.language(of: word),
+        let word = Words.core(typed)
+        guard !busy, typed.utf16.count >= 2, Words.language(of: word) != nil,
               !protected.contains(Words.normalized(word)) else { return false }
         busy = true; requests += 1
         queue.async { [self] in
@@ -40,19 +42,8 @@ final class SpellService {
             }
             var result: Correction?
             if healthy == true {
-                let original = verdict(word, language: language, correction: false)
-                if !original.known {
-                    let alternate = map?.convert(word, to: language == .en ? .ru : .en)
-                    let alternateVerdict = alternate.flatMap {
-                        guard Words.isCandidate($0) else { return nil as WordVerdict? }
-                        // Profile recognition is request-local: removing a word must take effect without retry.
-                        return protected.contains(Words.normalized($0)) ? WordVerdict(known: true) :
-                            verdict($0, language: language == .en ? .ru : .en, correction: false)
-                    }
-                    let detailed = alternateVerdict?.known == true || !spelling || word.utf16.count < 3 ? original :
-                        verdict(word, language: language, correction: true)
-                    result = Decision.choose(word: word, original: detailed, alternate: alternate,
-                        alternateVerdict: alternateVerdict, protected: protected, spelling: spelling)
+                result = Decision.analyze(typed, map: map, protected: protected, spelling: spelling) {
+                    verdict($0, language: $1, correction: $2)
                 }
             }
             let milliseconds = (ProcessInfo.processInfo.systemUptime - start) * 1_000

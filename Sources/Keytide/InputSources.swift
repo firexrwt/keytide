@@ -88,7 +88,8 @@ final class InputSources {
     func targetID(_ language: Language) -> String? { language == .en ? english?.id : russian?.id }
 
     func keystrokes(_ word: String, source: String) -> [Stroke]? {
-        guard Words.language(of: word) != nil, let keys = strokes[source] else { return nil }
+        // A replacement may carry punctuation ("привет."): every character needs a key, the language is checked before.
+        guard !word.isEmpty, let keys = strokes[source] else { return nil }
         let result = word.compactMap { keys[$0] }
         return result.count == word.count ? result : nil
     }

@@ -2,6 +2,20 @@
 
 All notable changes to Keytide, newest first. Each version's section is also the text of its GitHub release.
 
+## 0.1.6 - 2026-10-13
+
+### Fixed
+
+- Words with letters on punctuation keys are corrected: "Юлить" typed as `>kbnm`, "Эхом" as `"[jv` ([#1](https://github.com/firexrwt/keytide/issues/1)).
+- Punctuation keys at the end of a word are converted with it: `yj;` becomes "нож", not "но;", and `gj.` becomes "пою", not "по.".
+- Sentence punctuation follows the layout: "привет." typed with the other layout's keys (`ghbdtn&` with Apple Russian, `ghbdtn/` with Russian - PC) comes out as "привет.", and `руддщю` as "hello.".
+- Smart quotes that Notes and TextEdit put in place of the `'` and `"` keys no longer stop the correction of a word starting with э or Э.
+
+### Changed
+
+- The keystroke path and the field path replace the whole run typed since the last space, punctuation included. A word already known as typed ("hello," or "no;") stays as it is; a typo correction keeps the punctuation as typed.
+- The decision for a typed run (`Decision.analyze`) lives in KeytideCore and is covered by tests for both Russian layouts.
+
 ## 0.1.5 - 2026-10-13
 
 ### Changed

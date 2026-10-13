@@ -114,8 +114,9 @@ final class FocusedText {
             guard range.location >= tail.utf16.count else { return Self.lagging }
             guard let actual = text(element, range: NSRange(location: range.location - tail.utf16.count,
                                                             length: tail.utf16.count)) else { return "tail unreadable" }
-            // Contenteditable fields report a typed trailing space as a no-break space.
-            let shown = actual.replacingOccurrences(of: "\u{00A0}", with: " ")
+            // Contenteditable fields report a typed trailing space as a no-break space; editors may have turned the
+            // typed "'" and "\"" into smart quotes.
+            let shown = Words.plainQuotes(actual.replacingOccurrences(of: "\u{00A0}", with: " "))
             if shown == tail { return nil }
             return shown.last == " " ? "text changed" : Self.lagging
         }

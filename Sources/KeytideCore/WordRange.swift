@@ -19,13 +19,13 @@ public struct WordRange: Equatable {
         }
         while end > 0, let scalar = UnicodeScalar(ns.character(at: end - 1)),
               CharacterSet.whitespacesAndNewlines.contains(scalar) { end -= 1 }
-        while end > 0, let scalar = UnicodeScalar(ns.character(at: end - 1)), Words.trailingPunctuation.contains(scalar) { end -= 1 }
+        // The whole run up to the space, punctuation included: a layout correction converts and replaces all of it.
         var start = end
         while start > 0, let scalar = UnicodeScalar(ns.character(at: start - 1)),
               !CharacterSet.whitespacesAndNewlines.contains(scalar) { start -= 1 }
         guard start < end, end - start <= Words.maximumLength, start > 0 || offset == 0 else { return nil }
         let range = NSRange(location: start, length: end - start), word = ns.substring(with: range)
-        guard Words.language(of: word) != nil else { return nil }
+        guard Words.language(of: Words.core(word)) != nil else { return nil }
         return WordRange(word: word, range: NSRange(location: offset + start, length: range.length))
     }
 }

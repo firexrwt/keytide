@@ -6,7 +6,8 @@ final class CorrectionTests: XCTestCase {
         XCTAssertEqual(LayoutMap.qwerty.convert("Ghbdtn", to: .ru), "Привет")
         XCTAssertEqual(LayoutMap.qwerty.convert("Руддщ", to: .en), "Hello")
         XCTAssertNil(LayoutMap.qwerty.convert("", to: .ru))
-        XCTAssertNil(LayoutMap.qwerty.convert("hello!", to: .ru))
+        // A key with the same character in both layouts keeps it; the decision validates the result.
+        XCTAssertEqual(LayoutMap.qwerty.convert("hello!", to: .ru), "руддщ!")
     }
 
     func testDecisionRequiresUnknownOriginalAndKnownPlainAlternate() {

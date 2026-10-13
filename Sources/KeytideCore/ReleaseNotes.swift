@@ -55,6 +55,18 @@ public enum ReleaseNotes {
                 "Scrolling no longer passes through Keytide.",
             ],
         ],
+        "0.1.6": [
+            "ru": [
+                "Исправляются слова с буквами, которые стоят на клавишах знаков препинания: «Юлить», «Эхом», «нож», «люблю», набранные не в той раскладке.",
+                "Знаки после слова переводятся вместе с ним: «привет.» и «привет,» не в той раскладке становятся «привет.» и «привет,», а «нож» больше не превращается в «но;».",
+                "В Заметках и TextEdit исправляются и слова, которые начинаются с кавычки-буквы «э».",
+            ],
+            "en": [
+                "Words with letters on punctuation keys are corrected: Юлить, Эхом, нож, люблю typed in the wrong layout.",
+                "Punctuation after a word is converted with it: привет. and привет, typed in the wrong layout come out right, and нож no longer turns into но;.",
+                "In Notes and TextEdit, words starting with э (the quote key) are corrected too.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

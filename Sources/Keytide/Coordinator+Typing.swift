@@ -22,7 +22,7 @@ extension Coordinator {
             later(delay, revision: revision) { [weak self] in self?.correctTyped(typed, revision: revision, owner: pid) }
             return
         }
-        let started = spell.analyze(resolved.retype.word, map: sources.map, protected: store.immune,
+        let started = spell.analyze(resolved.retype.run, map: sources.map, protected: store.immune,
                                     spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }
             InputDiagnostics.record("keys analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")
