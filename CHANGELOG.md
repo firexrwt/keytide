@@ -2,6 +2,14 @@
 
 All notable changes to Keytide, newest first. Each version's section is also the text of its GitHub release.
 
+## 0.1.9 - 2026-11-04
+
+### Changed
+
+- A typo fix must be a slip of the finger. The spell checker's suggestion used to be taken whenever it was one edit away, so a far-off letter brought in an unrelated word. Now a replaced letter must sit on a key next to the right one (`приыет` -> "привет", `hwllo` -> "hello"), and an extra letter must be a neighbouring or the same key as the letter before or after it (`hrello`, `helllo`). A missed letter or two swapped letters (`teh` -> "the") are fixed as before. `превет` and `малоко` stay as typed.
+- Key positions come from the enabled layouts themselves (the key each layout types a letter with), so Dvorak and both Russian layouts use their own neighbours. Without both an English and a Russian layout there are no typo fixes (Keytide then already shows "Add the Russian and English layouts in macOS" and dims its icon).
+- Only the checker's first suggestion is considered, as before: its later guesses for `превет` include "пресет", a neighbouring-key slip but not the word meant.
+
 ## 0.1.8 - 2026-10-13
 
 ### Added

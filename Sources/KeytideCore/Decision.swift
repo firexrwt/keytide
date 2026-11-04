@@ -36,7 +36,7 @@ public enum Decision {
         let detailed = alternateVerdict?.known == true || !spellable ? original : verdict(word, language, true)
         // Layout first, then the word alone, then a typo fix: the order of 0.1.5.
         if let result = choose(run, lead: lead, original: detailed, alternate: alternate,
-                               alternateVerdict: alternateVerdict, protected: protected, spelling: false) {
+                               alternateVerdict: alternateVerdict, protected: protected, spelling: false, keys: map) {
             return result
         }
         // The word alone, its sentence punctuation kept as typed (as before 0.1.6): "ghbdtn," with the US comma key
@@ -49,21 +49,23 @@ public enum Decision {
                               kind: .layout)
         }
         return choose(run, lead: lead, original: detailed, alternate: nil, alternateVerdict: nil,
-                      protected: protected, spelling: spelling)
+                      protected: protected, spelling: spelling, keys: map)
     }
 
     // `original` is the verdict on the run's word as typed, `alternate` the converted run and `alternateVerdict` the
     // verdict on its word. A spelling correction keeps the punctuation around the word as typed.
     public static func choose(word run: String, original: WordVerdict, alternate: String?,
                               alternateVerdict: WordVerdict?, protected: Set<String>,
-                              spelling: Bool) -> Correction? {
+                              spelling: Bool, keys: LayoutMap? = nil) -> Correction? {
         choose(run, lead: 0, original: original, alternate: alternate, alternateVerdict: alternateVerdict,
-               protected: protected, spelling: spelling)
+               protected: protected, spelling: spelling, keys: keys)
     }
 
-    // `lead`: how many leading characters of the run are punctuation in both layouts (an opening quote).
+    // `lead`: how many leading characters of the run are punctuation in both layouts (an opening quote). `keys`: the
+    // layouts' keys, without which there is no typo fix (see `LayoutMap.slip`).
     static func choose(_ run: String, lead: Int, original: WordVerdict, alternate: String?,
-                       alternateVerdict: WordVerdict?, protected: Set<String>, spelling: Bool) -> Correction? {
+                       alternateVerdict: WordVerdict?, protected: Set<String>, spelling: Bool,
+                       keys: LayoutMap?) -> Correction? {
         let (body, trail) = Words.split(run)
         let opening = String(body.prefix(lead)), word = String(body.dropFirst(lead))
         guard run.utf16.count >= 2, let source = Words.language(of: word),
@@ -86,7 +88,8 @@ public enum Decision {
               word == word.lowercased() || word == word.uppercased() || word == word.capitalized,
               let suggestion = original.correction,
               Words.language(of: suggestion) == source, Words.isPlain(suggestion),
-              Words.oneEditApart(word, suggestion), !protected.contains(Words.normalized(suggestion)) else {
+              keys?.slip(word, from: suggestion, in: source) == true,
+              !protected.contains(Words.normalized(suggestion)) else {
             return nil
         }
         let replacement = opening + Words.applyCase(of: word, to: suggestion) + trail

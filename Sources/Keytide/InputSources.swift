@@ -80,7 +80,9 @@ final class InputSources {
                 forward[a] = b; backward[b] = a
             }
         }
-        map = LayoutMap(englishToRussian: forward, russianToEnglish: backward)
+        map = LayoutMap(englishToRussian: forward, russianToEnglish: backward,
+                        keys: [.en: strokes[english.id, default: [:]].mapValues(\.key),
+                               .ru: strokes[russian.id, default: [:]].mapValues(\.key)])
     }
 
     func reload() { entries = []; configure(configuration) }

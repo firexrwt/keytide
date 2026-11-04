@@ -111,7 +111,8 @@ final class CorrectionTests: XCTestCase {
             alternate: nil,
             alternateVerdict: nil,
             protected: ["the"],
-            spelling: true
+            spelling: true,
+            keys: .qwerty
         ))
     }
 
@@ -139,7 +140,7 @@ final class CorrectionTests: XCTestCase {
             protected: ["сфе"], spelling: false))
         XCTAssertNil(Decision.choose(word: "локи", original: WordVerdict(known: false, correction: "луки"),
             alternate: "kjrb", alternateVerdict: WordVerdict(known: true),
-            protected: ["локи"], spelling: true))
+            protected: ["локи"], spelling: true, keys: .qwerty))
     }
 
     func testTwoLetterLayoutsPreserveCaseAndKnownOriginals() {
@@ -193,11 +194,11 @@ final class CorrectionTests: XCTestCase {
         XCTAssertNil(spellingReplacement(word: "ab", suggestion: "ac"))
 
         let withinLimit = String(repeating: "a", count: Words.maximumLength - 1) + "b"
-        let withinSuggestion = String(repeating: "a", count: Words.maximumLength - 1) + "c"
+        let withinSuggestion = String(repeating: "a", count: Words.maximumLength - 1) + "v"
         XCTAssertEqual(spellingReplacement(word: withinLimit, suggestion: withinSuggestion), withinSuggestion)
 
         let overLimit = String(repeating: "a", count: Words.maximumLength) + "b"
-        let overSuggestion = String(repeating: "a", count: Words.maximumLength) + "c"
+        let overSuggestion = String(repeating: "a", count: Words.maximumLength) + "v"
         XCTAssertNil(spellingReplacement(word: overLimit, suggestion: overSuggestion))
     }
 
@@ -208,7 +209,8 @@ final class CorrectionTests: XCTestCase {
             alternate: nil,
             alternateVerdict: nil,
             protected: [],
-            spelling: enabled
+            spelling: enabled,
+            keys: .qwerty
         )?.replacement
     }
 }

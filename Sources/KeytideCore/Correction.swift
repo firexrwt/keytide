@@ -4,9 +4,13 @@ public enum Language: String, Codable, CaseIterable { case en, ru }
 
 public struct LayoutMap {
     private let maps: [Language: [Character: Character]]
+    // Per layout, the virtual key code that types a character: where a typo fix may come from (see `slip`).
+    let keys: [Language: [Character: UInt16]]
 
-    public init(englishToRussian: [Character: Character], russianToEnglish: [Character: Character]) {
+    public init(englishToRussian: [Character: Character], russianToEnglish: [Character: Character],
+                keys: [Language: [Character: UInt16]] = [:]) {
         maps = [.ru: englishToRussian, .en: russianToEnglish]
+        self.keys = keys
     }
 
     // The whole typed run, punctuation included: what the same keys give in the other layout. A character missing
@@ -24,7 +28,10 @@ public struct LayoutMap {
         let english = Array("qwertyuiop[]asdfghjkl;'zxcvbnm,./`QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>?~@#$^&")
         let russian = Array("йцукенгшщзхъфывапролджэячсмитьбю.ёЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,Ё\"№;:?")
         let forward = Dictionary(uniqueKeysWithValues: zip(english, russian))
-        return LayoutMap(englishToRussian: forward, russianToEnglish: Dictionary(uniqueKeysWithValues: zip(russian, english)))
+        let order = KeyGrid.qwertyOrder
+        return LayoutMap(englishToRussian: forward, russianToEnglish: Dictionary(uniqueKeysWithValues: zip(russian, english)),
+                         keys: [.en: Dictionary(uniqueKeysWithValues: zip(english.prefix(order.count), order)),
+                                .ru: Dictionary(uniqueKeysWithValues: zip(russian.prefix(order.count), order))])
     }()
 }
 
