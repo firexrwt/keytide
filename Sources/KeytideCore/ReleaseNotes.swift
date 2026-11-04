@@ -93,6 +93,18 @@ public enum ReleaseNotes {
                 "Where a field shows its caret but hides its text, a word after you moved the caret is read through the clipboard, and your clipboard is put back at once. A clipboard history app may still catch it; turn this off in Settings.",
             ],
         ],
+        "0.1.9": [
+            "ru": [
+                "Опечатки исправляются, только если это промах пальца: соседняя клавиша вместо нужной (приыет - привет), лишнее нажатие соседней или той же клавиши, пропущенная буква или две переставленные.",
+                "Если буква заменена на далёкую (превет), Keytide оставляет слово как есть и больше не подставляет случайные похожие слова.",
+                "Короткие слова капсом - аббревиатуры (VRAM, UDP), их Keytide больше не исправляет.",
+            ],
+            "en": [
+                "Typos are fixed only when they are a slip of the finger: a key next to the right one (hwllo - hello), an extra press of a neighbouring or the same key, a missed letter or two swapped ones.",
+                "A letter replaced by a far-off one is left as typed: Keytide no longer puts in random similar words.",
+                "Short words in capitals are acronyms (VRAM, UDP): Keytide no longer fixes them.",
+            ],
+        ],
     ]
 
     // `language`: "ru" or "en"; anything else gets English.

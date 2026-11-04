@@ -111,7 +111,8 @@ final class CorrectionTests: XCTestCase {
             alternate: nil,
             alternateVerdict: nil,
             protected: ["the"],
-            spelling: true
+            spelling: true,
+            keys: .qwerty
         ))
     }
 
@@ -139,7 +140,7 @@ final class CorrectionTests: XCTestCase {
             protected: ["сфе"], spelling: false))
         XCTAssertNil(Decision.choose(word: "локи", original: WordVerdict(known: false, correction: "луки"),
             alternate: "kjrb", alternateVerdict: WordVerdict(known: true),
-            protected: ["локи"], spelling: true))
+            protected: ["локи"], spelling: true, keys: .qwerty))
     }
 
     func testTwoLetterLayoutsPreserveCaseAndKnownOriginals() {
@@ -162,9 +163,50 @@ final class CorrectionTests: XCTestCase {
     }
 
     func testSpellingDecisionPreservesUpperTitleAndLowerCase() {
-        XCTAssertEqual(spellingReplacement(word: "TEH", suggestion: "the"), "THE")
+        XCTAssertEqual(spellingReplacement(word: "HWLLO", suggestion: "hello"), "HELLO")
         XCTAssertEqual(spellingReplacement(word: "Teh", suggestion: "the"), "The")
         XCTAssertEqual(spellingReplacement(word: "teh", suggestion: "THE"), "the")
+    }
+
+    // TSK-154: only the checker's own correction is a typo fix. Its guesses are not an answer ("превет" gave "пресет",
+    // "barrs" a different word per call) and scanning them adds random words; no app source may ask for them.
+    func testCheckerGuessesAreNeverAsked() throws {
+        let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Keytide")
+        var files = 0
+        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) where name.hasSuffix(".swift") {
+            let text = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertFalse(text.contains("guesses(forWordRange"), name)
+            files += 1
+        }
+        XCTAssertGreaterThan(files, 20, "the app sources were found")
+    }
+
+    // Both decisions get the map with the keyboard in use (ISO moves "ё" of Apple Russian next to "э"), and the map
+    // carries the layouts' keys, without which every typo fix is refused.
+    func testDecisionsUseTheTypingMapWithKeys() throws {
+        let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Keytide")
+        var analyses = 0
+        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) where name.hasSuffix(".swift") {
+            let text = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            for line in text.split(separator: "\n") where line.contains("spell.analyze(") {
+                XCTAssertTrue(line.contains("map: sources.typingMap"), "\(name): \(line)")
+                analyses += 1
+            }
+        }
+        XCTAssertEqual(analyses, 2, "the field path and the keystroke path")
+        let sources = try String(contentsOf: folder.appendingPathComponent("InputSources.swift"), encoding: .utf8)
+        XCTAssertTrue(sources.contains("keys: [.en: strokes[english.id"), "InputSources builds LayoutMap.keys")
+    }
+
+    // All-caps words of up to four letters are acronyms (VRAM, UDP, ПКМ), never typo fixes.
+    func testShortAllCapsWordsAreAcronyms() {
+        XCTAssertNil(spellingReplacement(word: "TEH", suggestion: "the"))
+        XCTAssertNil(spellingReplacement(word: "VRAN", suggestion: "vram"))
+        XCTAssertNil(spellingReplacement(word: "КОЬ", suggestion: "кот"))
+        XCTAssertEqual(spellingReplacement(word: "коь", suggestion: "кот"), "кот")
+        XCTAssertEqual(spellingReplacement(word: "ПРИЫЕТ", suggestion: "привет"), "ПРИВЕТ")
     }
 
     func testSpellingDecisionRejectsMixedCaseProperNoun() {
@@ -193,11 +235,11 @@ final class CorrectionTests: XCTestCase {
         XCTAssertNil(spellingReplacement(word: "ab", suggestion: "ac"))
 
         let withinLimit = String(repeating: "a", count: Words.maximumLength - 1) + "b"
-        let withinSuggestion = String(repeating: "a", count: Words.maximumLength - 1) + "c"
+        let withinSuggestion = String(repeating: "a", count: Words.maximumLength - 1) + "v"
         XCTAssertEqual(spellingReplacement(word: withinLimit, suggestion: withinSuggestion), withinSuggestion)
 
         let overLimit = String(repeating: "a", count: Words.maximumLength) + "b"
-        let overSuggestion = String(repeating: "a", count: Words.maximumLength) + "c"
+        let overSuggestion = String(repeating: "a", count: Words.maximumLength) + "v"
         XCTAssertNil(spellingReplacement(word: overLimit, suggestion: overSuggestion))
     }
 
@@ -208,7 +250,8 @@ final class CorrectionTests: XCTestCase {
             alternate: nil,
             alternateVerdict: nil,
             protected: [],
-            spelling: enabled
+            spelling: enabled,
+            keys: .qwerty
         )?.replacement
     }
 }
