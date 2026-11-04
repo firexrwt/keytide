@@ -47,6 +47,28 @@ final class KeyGridTests: XCTestCase {
         }
     }
 
+    // ISO (this owner's MacBook): "\" (42, Apple Russian "ё") ends the home row next to "'" ("э"), "§" (10) is the
+    // top-left key, "`" (50) sits left of Z. Letter keys do not move.
+    func testISOMovesTheThreeKeysOnly() {
+        XCTAssertTrue(KeyGrid.adjacent(42, 39, iso: true))
+        XCTAssertTrue(KeyGrid.adjacent(42, 30, iso: true))
+        XCTAssertFalse(KeyGrid.adjacent(42, 39))
+        XCTAssertTrue(KeyGrid.adjacent(42, 30))
+        XCTAssertTrue(KeyGrid.adjacent(50, 6, iso: true), "` next to z")
+        XCTAssertTrue(KeyGrid.adjacent(50, 0, iso: true), "` next to a")
+        XCTAssertFalse(KeyGrid.adjacent(50, 6))
+        XCTAssertTrue(KeyGrid.adjacent(10, 18, iso: true), "§ next to 1")
+        XCTAssertFalse(KeyGrid.adjacent(10, 18), "no § key on ANSI")
+        for (a, b) in [(12, 13), (12, 0), (13, 0), (2, 8), (5, 11)] as [(UInt16, UInt16)] {
+            XCTAssertEqual(KeyGrid.adjacent(a, b, iso: true), KeyGrid.adjacent(a, b), "\(a) \(b)")
+        }
+        var apple = LayoutMap(englishToRussian: [:], russianToEnglish: [:],
+                              keys: [.ru: LayoutMap.qwerty.keys[.ru]!.merging(["ё": 42]) { $1 }])
+        XCTAssertFalse(apple.slip("ещэ", from: "ещё", in: .ru))
+        apple.isoKeyboard = true
+        XCTAssertTrue(apple.slip("ещэ", from: "ещё", in: .ru))
+    }
+
     func testNoKnownKeysIsNoSlip() {
         XCTAssertFalse(LayoutMap(englishToRussian: [:], russianToEnglish: [:]).slip("hwllo", from: "hello", in: .en))
         XCTAssertFalse(LayoutMap.qwerty.slip("hwllo", from: "hello", in: .ru))

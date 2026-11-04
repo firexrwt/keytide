@@ -6,6 +6,8 @@ public struct LayoutMap {
     private let maps: [Language: [Character: Character]]
     // Per layout, the virtual key code that types a character: where a typo fix may come from (see `slip`).
     let keys: [Language: [Character: UInt16]]
+    // The keyboard in use is ISO (see `KeyGrid`): set by the app when a word is decided.
+    public var isoKeyboard = false
 
     public init(englishToRussian: [Character: Character], russianToEnglish: [Character: Character],
                 keys: [Language: [Character: UInt16]] = [:]) {

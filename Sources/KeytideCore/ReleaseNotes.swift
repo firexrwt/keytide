@@ -97,10 +97,12 @@ public enum ReleaseNotes {
             "ru": [
                 "Опечатки исправляются, только если это промах пальца: соседняя клавиша вместо нужной (приыет - привет), лишнее нажатие соседней или той же клавиши, пропущенная буква или две переставленные.",
                 "Если буква заменена на далёкую (превет), Keytide оставляет слово как есть и больше не подставляет случайные похожие слова.",
+                "Короткие слова капсом - аббревиатуры (VRAM, UDP), их Keytide больше не исправляет.",
             ],
             "en": [
                 "Typos are fixed only when they are a slip of the finger: a key next to the right one (hwllo - hello), an extra press of a neighbouring or the same key, a missed letter or two swapped ones.",
                 "A letter replaced by a far-off one is left as typed: Keytide no longer puts in random similar words.",
+                "Short words in capitals are acronyms (VRAM, UDP): Keytide no longer fixes them.",
             ],
         ],
     ]

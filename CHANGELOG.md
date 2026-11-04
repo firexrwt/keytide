@@ -7,8 +7,10 @@ All notable changes to Keytide, newest first. Each version's section is also the
 ### Changed
 
 - A typo fix must be a slip of the finger. The spell checker's suggestion used to be taken whenever it was one edit away, so a far-off letter brought in an unrelated word. Now a replaced letter must sit on a key next to the right one (`приыет` -> "привет", `hwllo` -> "hello"), and an extra letter must be a neighbouring or the same key as the letter before or after it (`hrello`, `helllo`). A missed letter or two swapped letters (`teh` -> "the") are fixed as before. `превет` and `малоко` stay as typed.
-- Key positions come from the enabled layouts themselves (the key each layout types a letter with), so Dvorak and both Russian layouts use their own neighbours. Without both an English and a Russian layout there are no typo fixes (Keytide then already shows "Add the Russian and English layouts in macOS" and dims its icon).
-- Only the checker's first suggestion is considered, as before: its later guesses for `превет` include "пресет", a neighbouring-key slip but not the word meant.
+- Key positions come from the enabled layouts themselves (the key each layout types a letter with), so Dvorak and both Russian layouts use their own neighbours. The keyboard in use is read for each word: on ISO keyboards "ё" of Apple Russian sits next to "э", and an external ANSI keyboard on an ISO MacBook is handled too. Without both an English and a Russian layout there are no typo fixes (Keytide then already shows "Add the Russian and English layouts in macOS" and dims its icon).
+- Only the spell checker's own correction is used. When it had none, its first guess was taken, and that guess was not reliable: `превет` became "пресет", and the same typo got a different word from one call to the next. Its other guesses are not tried either: they hold more wrong words that are still neighbouring-key slips.
+- All-caps words of up to four letters are acronyms and are no longer fixed as typos (`VRAM`, `UDP`, `ПКМ`). A longer word in capitals is fixed as before (`ПРИЫЕТ` -> "ПРИВЕТ").
+- Measured with the real dictionaries against 0.1.8, both Russian layouts. On 327,082 words of correct text: 689 false typo fixes instead of 4,319, and 0.1.8 made every one of them too. On synthetic slips onto neighbouring keys in 1,500 words per language: 6,044 fixes in English (6,078 before) and 5,649 in Russian (5,701 before), with 385 wrong words instead of 1,139 and 317 instead of 945. Layout corrections are unchanged, word for word.
 
 ## 0.1.8 - 2026-10-13
 

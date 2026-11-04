@@ -87,6 +87,17 @@ final class InputSources {
 
     func reload() { entries = []; configure(configuration) }
 
+    // The map for deciding a word, with the keyboard in use: an external ANSI keyboard on an ISO MacBook moves "ё" of
+    // Apple Russian, so the type is read now (two table reads), not when the map was built. The keys need no rebuild:
+    // UCKeyTranslate gives every letter the same key under ANSI and ISO (measured 2026-11-04; only Russian - PC adds
+    // a second "ё" on key 50). ponytail: LMGetKbdType changed between processes (3, then 92) but a keyboard swap while
+    // Keytide runs is unverified; only "ё" next to "э" depends on it. The tap's keyboardEventKeyboardType if it matters.
+    var typingMap: LayoutMap? {
+        guard var map else { return nil }
+        map.isoKeyboard = KBGetLayoutType(Int16(LMGetKbdType())) == kKeyboardISO
+        return map
+    }
+
     func targetID(_ language: Language) -> String? { language == .en ? english?.id : russian?.id }
 
     func keystrokes(_ word: String, source: String) -> [Stroke]? {

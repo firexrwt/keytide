@@ -7,7 +7,7 @@ import KeytideCore
 extension Coordinator {
     func correctField(_ snapshot: TextSnapshot, revision: UInt64) {
         InputDiagnostics.record("captured word")
-        _ = spell.analyze(snapshot.word.word, map: sources.map, protected: store.immune,
+        _ = spell.analyze(snapshot.word.word, map: sources.typingMap, protected: store.immune,
                           spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }
             InputDiagnostics.record("analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")

@@ -82,10 +82,11 @@ public enum Decision {
             }
         }
         // A typo fix only for a plain word with sentence punctuation after it, as before 0.1.6: not inside code
-        // spans, quotes or markup ("`npm`", "ECC**").
+        // spans, quotes or markup ("`npm`", "ECC**"). An all-caps word of up to four letters is an acronym, not a typo
+        // (VRAM, UDP, ПКМ: 242 of the 246 all-caps false fixes the 0.1.9 corpus probe found).
         guard spelling, !original.known, opening.isEmpty, Edges.sentenceSplit(run).body == word,
               word.utf16.count >= 3, Words.isPlain(word),
-              word == word.lowercased() || word == word.uppercased() || word == word.capitalized,
+              word == word.lowercased() || word == word.capitalized || word == word.uppercased() && word.count > 4,
               let suggestion = original.correction,
               Words.language(of: suggestion) == source, Words.isPlain(suggestion),
               keys?.slip(word, from: suggestion, in: source) == true,

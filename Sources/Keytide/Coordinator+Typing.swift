@@ -33,7 +33,7 @@ extension Coordinator {
     }
 
     private func analyzeTyped(_ resolved: Typed, pid: pid_t, revision: UInt64) {
-        let started = spell.analyze(resolved.retype.run, map: sources.map, protected: store.immune,
+        let started = spell.analyze(resolved.retype.run, map: sources.typingMap, protected: store.immune,
                                     spelling: store.profile.spelling) { [weak self] correction, available in
             guard let self else { return }
             InputDiagnostics.record("keys analyzed available=\(available) correction=\(correction != nil) stale=\(generation != revision)")

@@ -7,7 +7,7 @@ Type `ghbdtn ` and get `привет `, type `руддщ ` and get `hello `: aft
 ## Features
 
 - Wrong-layout words corrected after a space, both directions, from two letters (`lf` -> `да`). Case is kept. English contractions typed in the Russian layout are fixed too (`дуеэы` -> `let's`).
-- Obvious typos corrected from three letters, only when the typo is one slip of the finger: a key next to the right one (`hwllo` -> `hello`), a neighbouring or the same key pressed with it (`hrello`, `helllo`), a missed key or two swapped keys. A spelling mistake with a far-off letter (`превет`) is left as typed.
+- Obvious typos corrected from three letters, only when the typo is one slip of the finger: a key next to the right one (`hwllo` -> `hello`), a neighbouring or the same key pressed with it (`hrello`, `helllo`), a missed key or two swapped keys. A spelling mistake with a far-off letter (`превет`) and acronyms of up to four capitals (`VRAM`) are left as typed.
 - Single Option, within 10 seconds of a correction, undoes it and restores the previous layout. The menu bar icon dims while Keytide is not correcting. Control+D protects a word from corrections. Both shortcuts are configurable.
 - Protected words also work as layout targets: protect `локи` and `kjrb` becomes `локи`.
 - Optional learning: two undos of the same word stop correcting it. Learned words can be reviewed and forgotten in Settings.

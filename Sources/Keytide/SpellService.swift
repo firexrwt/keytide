@@ -73,11 +73,11 @@ final class SpellService {
         let known = lexicon?.contains(word) == true || Words.checkable(word) && isKnown(word, language)
         var suggestion: String?
         if !known && correction && Words.isPlain(word) {
+            // The checker's own correction only (TSK-154): when it has none, its first guess is no answer ("превет"
+            // gave "пресет", "barrs" "barre" one call and "barry" the next), and later guesses add random words.
             let range = NSRange(location: 0, length: word.utf16.count)
             let proposed = checker.correction(forWordRange: range, in: word,
-                language: language.rawValue, inSpellDocumentWithTag: tag) ??
-                checker.guesses(forWordRange: range, in: word, language: language.rawValue,
-                    inSpellDocumentWithTag: tag)?.first
+                language: language.rawValue, inSpellDocumentWithTag: tag)
             if let candidate = proposed, Words.oneEditApart(word, candidate) {
                 suggestion = candidate
             }
